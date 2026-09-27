@@ -11,10 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -25,6 +23,7 @@ import java.util.Map;
 public class UserController {
     private final UserService userService;
     private final SecurityService securityService;
+    private final PasswordEncoder passwordEncoder;
 
     private Logger logger = LoggerFactory.getLogger(UserController.class);
 
@@ -85,5 +84,87 @@ public class UserController {
         User user = userService.getUserByEmail((String) auth.getPrincipal());
         UserResponse userResponse = new UserResponse(user.getName(), user.getEmail());
         return ResponseEntity.ok(userResponse);
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PatchMapping("/users/me/password")
+    public ResponseEntity<?> updatePassword(Authentication auth, @RequestBody Map<String, String> requestBody) {
+        try {
+            String email = (String) auth.getPrincipal();
+            User user = userService.getUserByEmail(email);
+            String oldPassword = requestBody.get("oldPassword");
+            if (oldPassword == null || oldPassword.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "error", "BAD_REQUEST",
+                                "message", "Old password is required"
+                        ));
+            }
+            String newPassword = requestBody.get("newPassword");
+            if (newPassword == null || newPassword.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "error", "BAD_REQUEST",
+                                "message", "New password is required"
+                        ));
+            }
+            if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "error", "BAD_REQUEST",
+                                "message", "Old password is incorrect"
+                        ));
+            }
+            userService.updatePassword(email, newPassword);
+            return ResponseEntity.ok("Password updated successfully");
+        } catch (Exception e) {
+            logger.error("Error occurred while updating password: {}", e.getMessage(), e);
+            return ResponseEntity.status(500)
+                .body(Map.of(
+                        "error", "INTERNAL_SERVER_ERROR",
+                        "message", e.getMessage()
+                ));
+        }
+    }
+
+    @PatchMapping("/users/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> requestBody) {
+        try {
+            String email = requestBody.get("email");
+            if (email == null || email.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "error", "BAD_REQUEST",
+                                "message", "Email is required"
+                        ));
+            }
+            // Email verification should be implemented here
+            // For now, just check if the email exists in the database then update the new password
+            User user = userService.getUserByEmail(email);
+            if (user == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "error", "BAD_REQUEST",
+                                "message", "Email does not exist"
+                        ));
+            }
+            String newPassword = requestBody.get("newPassword");
+            if (newPassword == null || newPassword.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "error", "BAD_REQUEST",
+                                "message", "New password is required"
+                        ));
+            }
+            userService.updatePassword(email, newPassword);
+            return ResponseEntity.ok("[FORGOT_PASSWORD] Password updated successfully");
+        } catch (Exception e) {
+            logger.error("Error occurred while updating password: {}", e.getMessage(), e);
+            return ResponseEntity.status(500)
+                .body(Map.of(
+                        "error", "INTERNAL_SERVER_ERROR",
+                        "message", e.getMessage()
+                ));
+        }
     }
 }

@@ -23,8 +23,6 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -54,11 +52,6 @@ public class SecurityConfig {
     private final TokenHelper tokenHelper;
     private final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
     // CORS config:
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -82,7 +75,8 @@ public class SecurityConfig {
                                 "/auth/**",
                                 "/api/stripe/webhook",
                                 "/health",
-                                "/anonymous_ready"
+                                "/anonymous_ready",
+                                "/api/users/forgot-password"
                                 ).permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2

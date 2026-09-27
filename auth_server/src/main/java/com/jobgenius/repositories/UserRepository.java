@@ -2,7 +2,9 @@ package com.jobgenius.repositories;
 
 import com.jobgenius.models.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,4 +28,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
         )
     """, nativeQuery = true)
     List<Long> findAllUserIdsHavingExpiredPlan();
+
+    // Update password
+    @Modifying
+    @Query(value = """
+    UPDATE users SET password = :password WHERE email = :email
+    """, nativeQuery = true)
+    void updatePassword(@Param("email") String email, @Param("password") String password);
 }
