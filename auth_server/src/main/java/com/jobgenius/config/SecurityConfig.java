@@ -156,13 +156,15 @@ public class SecurityConfig {
                         // OAuth2 login, change this
                         // to client URL
                 )
-                .addFilterBefore(apiLoggingFilter, APIKeyFilter.class)
-                .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(apiLoggingFilter, UsernamePasswordAuthenticationFilter.class)
+                // UsernamePasswordAuthenticationFilter is the filter implemented by Spring Security to handle username/password authentication.
+                // But we are using JWT tokens for authentication, UsernamePasswordAuthenticationFilter is not needed.
+                .addFilterAfter(apiKeyFilter, APILoggingFilter.class)
                 .addFilterAfter(rateLimitingFilter, APIKeyFilter.class)
                 .addFilterAfter(jwtAuthFilter, RateLimitingFilter.class)
                 // Explanation: STATELESS/IF_REQUIRED
-                // STATELESS policy
-                // IF_REQUIRED policy
+                // STATELESS policy: Since we are using JWT tokens for authentication, we don't need to store any session data on the server.
+                // IF_REQUIRED policy: If the request is authenticated, we will create a session for the user.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(
