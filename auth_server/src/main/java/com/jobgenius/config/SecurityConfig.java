@@ -5,6 +5,7 @@ import com.jobgenius.models.User;
 import com.jobgenius.repositories.RefreshTokenRepository;
 import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.security.APIKeyFilter;
+import com.jobgenius.security.APILoggingFilter;
 import com.jobgenius.security.JwtAuthFilter;
 import com.jobgenius.security.RateLimitingFilter;
 import com.jobgenius.services.JwtService;
@@ -42,6 +43,7 @@ public class SecurityConfig {
 
     @Value("${REACT_URL}")
     private String reactUrl;
+    private final APILoggingFilter apiLoggingFilter;
     private final JwtAuthFilter jwtAuthFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final UserService userService;
@@ -154,12 +156,15 @@ public class SecurityConfig {
                         // OAuth2 login, change this
                         // to client URL
                 )
-                .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(apiLoggingFilter, UsernamePasswordAuthenticationFilter.class)
+                // UsernamePasswordAuthenticationFilter is the filter implemented by Spring Security to handle username/password authentication.
+                // But we are using JWT tokens for authentication, UsernamePasswordAuthenticationFilter is not needed.
+                .addFilterAfter(apiKeyFilter, APILoggingFilter.class)
                 .addFilterAfter(rateLimitingFilter, APIKeyFilter.class)
                 .addFilterAfter(jwtAuthFilter, RateLimitingFilter.class)
                 // Explanation: STATELESS/IF_REQUIRED
-                // STATELESS policy
-                // IF_REQUIRED policy
+                // STATELESS policy: Since we are using JWT tokens for authentication, we don't need to store any session data on the server.
+                // IF_REQUIRED policy: If the request is authenticated, we will create a session for the user.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(
