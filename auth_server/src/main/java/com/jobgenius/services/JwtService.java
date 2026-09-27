@@ -25,7 +25,7 @@ public class JwtService {
     private final String SECRET_KEY = System.getenv("JWT_SECRET_KEY");
 
     private final RefreshTokenRepository refreshTokenRepository;
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(JwtService.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(JwtService.class);
 
     public JwtService(RefreshTokenRepository refreshTokenRepository) {
         this.refreshTokenRepository = refreshTokenRepository;
@@ -143,6 +143,6 @@ public class JwtService {
     public void cleanUpExpiredTokens() {
         Date now = new Date();
         int deleted = refreshTokenRepository.deleteByExpiryDateBeforeAndRevoked(now, true);
-        log.info("Cleaned up {} expired and revoked refresh tokens at {}", deleted, now);
+        logger.info("Cleaned up {} expired and revoked refresh tokens at {}", deleted, now);
     }
 }

@@ -5,6 +5,7 @@ import com.jobgenius.models.User;
 import com.jobgenius.repositories.RefreshTokenRepository;
 import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.security.APIKeyFilter;
+import com.jobgenius.security.APILoggingFilter;
 import com.jobgenius.security.JwtAuthFilter;
 import com.jobgenius.security.RateLimitingFilter;
 import com.jobgenius.services.JwtService;
@@ -42,6 +43,7 @@ public class SecurityConfig {
 
     @Value("${REACT_URL}")
     private String reactUrl;
+    private final APILoggingFilter apiLoggingFilter;
     private final JwtAuthFilter jwtAuthFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final UserService userService;
@@ -154,6 +156,7 @@ public class SecurityConfig {
                         // OAuth2 login, change this
                         // to client URL
                 )
+                .addFilterBefore(apiLoggingFilter, APIKeyFilter.class)
                 .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(rateLimitingFilter, APIKeyFilter.class)
                 .addFilterAfter(jwtAuthFilter, RateLimitingFilter.class)
