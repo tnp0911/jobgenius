@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -21,6 +22,7 @@ public class UserService {
     private final WebClient webClient;
     private final UserRepository userRepository;
     private final FastAPIUpdates fastAPIUpdates;
+    private final PasswordEncoder passwordEncoder;
     private final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     public List<User> getAllUsers() {
@@ -33,6 +35,12 @@ public class UserService {
 
     public User getUserById(Long id) {
         return userRepository.findById(id).orElse(null);
+    }
+
+    @Transactional
+    public void updatePassword(String email, String newPassword) {
+        String newHashPassword = passwordEncoder.encode(newPassword);
+        userRepository.updatePassword(email, newHashPassword);
     }
 
     @Transactional
