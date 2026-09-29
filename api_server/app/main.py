@@ -18,6 +18,7 @@ from app.routers.job_search_with_prompt_router import (
     router as job_search_with_prompt_router,
 )
 from app.routers.resume_router import router as resume_router
+from app.routers.usage_router import router as usage_router
 from app.routers.user_router import router as user_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,3 +82,4 @@ app.include_router(user_router)
 app.include_router(resume_router)
 app.include_router(job_recommender_router)
 app.include_router(job_search_with_prompt_router)
+app.include_router(usage_router)

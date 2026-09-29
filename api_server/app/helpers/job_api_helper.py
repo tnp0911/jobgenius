@@ -98,7 +98,7 @@ def jsearch_format_data(data: dict, json_to_text: str, pinecone_id: Optional[str
         location=Location(
             city=data.get("job_city") or "",
             province=data.get("job_state") or "",
-            country=data.get("job_country").upper(),
+            country=data.get("job_country").upper() if data.get("job_country") else "",
             latitude=data.get("job_latitude"),
             longitude=data.get("job_longitude"),
             remote=bool(data.get("job_is_remote")),

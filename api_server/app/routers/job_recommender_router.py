@@ -323,7 +323,7 @@ async def get_job_recommendations_premium_user(
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
                 )
-            
+            schedule_job_indexing(jobs)
             return await _cache_and_return_premium_recommendations(
                 recommendations_cache_key,
                 {"provider": "agent7_jobfinder", "jobs": jobs},

@@ -59,6 +59,12 @@ async def analyze_resume_free_tier(
             if current_user_id:
                 redis_client = get_redis_client()
                 usage_key = f"free_resume_analyzer_usage:{current_user_id}"
+                usage = await redis_client.get(usage_key)
+                if usage and int(usage) > ANALYZER_LIMIT:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"You have reached the maximum number of resume analyses for free tier. Please try again in {FREE_ANALYZER_RESET_WINDOW} days.",
+                    )
         resume_bytes = await convert_file_to_bytes(resume_pdf)
         resume_text = extract_text_from_resume(resume_pdf, resume_bytes)
         free_tier_analyzer = await build_free_tier_graph()
