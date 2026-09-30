@@ -563,11 +563,29 @@ export function JobRecommenderWorkspace() {
           ) : null}
 
         {phase === "loading" || phase === "searching" ? (
-          <div className="jobs-status" aria-busy="true">
-            {phase === "searching"
-              ? "Reading your resume and hunting roles…"
-              : "Loading…"}
-          </div>
+          isPremium && phase === "loading" && mode === "recommendations" ? (
+            <div
+              className="jobs-status jobs-status-premium"
+              aria-busy="true"
+              role="status"
+            >
+              <p className="jobs-status-kicker">Premium matching</p>
+              <p className="jobs-status-title">
+                Running semantic vector matching…
+              </p>
+              <p className="jobs-status-lead">
+                We&apos;re comparing your full resume embedding against the job
+                index. This can take a few seconds to a few minutes — hang tight
+                while we find the strongest matches.
+              </p>
+            </div>
+          ) : (
+            <div className="jobs-status" aria-busy="true">
+              {phase === "searching"
+                ? "Reading your resume and hunting roles…"
+                : "Loading…"}
+            </div>
+          )
         ) : error && showingJobs.length === 0 ? (
           <p className="jobs-empty" role="alert">
             {error}
