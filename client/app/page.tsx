@@ -243,11 +243,17 @@ export default function Home() {
       <section className="home-bottom-cta" aria-labelledby="home-bottom-title">
         <div className="mkt-shell">
           <h2 id="home-bottom-title">Ready when you are.</h2>
-          <p>Create a free account and take the first clear step today.</p>
+          <p>{status === "unauthenticated" ? "Create a free account and take the first clear step today." : "Take the first clear step today."}</p>
           <div className="mkt-cta-row">
-            <Link href="/register" className="mkt-btn mkt-btn-primary">
-              Create account
-            </Link>
+            {status === "unauthenticated" ? (
+              <Link href="/register" className="mkt-btn mkt-btn-primary">
+                Create account
+              </Link>
+            ) : (
+              <Link href="/analyzer" className="mkt-btn mkt-btn-primary">
+                Try R-Analyzer
+              </Link>
+            )}
             <Link href="/faqs" className="mkt-btn mkt-btn-ghost">
               Read FAQs
             </Link>

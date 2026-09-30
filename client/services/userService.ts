@@ -19,11 +19,18 @@ export async function getAllUsers(options?: AuthOptions): Promise<unknown> {
     }
 }
 
-export async function getCurrentUser(): Promise<unknown> {
+export type CurrentUser = {
+    name: string;
+    email: string;
+};
+
+export async function getCurrentUser(
+    options?: AuthOptions,
+): Promise<CurrentUser | null> {
     try {
-        const { data } = await axios.get(
+        const { data } = await axios.get<CurrentUser>(
             `${process.env.NEXT_PUBLIC_SPRING_API_URL}/api/users/me`,
-            authConfig(),
+            authConfig(options),
         );
         return data;
     } catch (error: unknown) {

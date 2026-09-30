@@ -96,14 +96,9 @@ export function LoginForm() {
           <label htmlFor="password">Password</label>
         </div>
         <p className="forgot-password-text">
-          <a
-            href="#"
-            className="forgot-password-link is-disabled"
-            onClick={(e) => e.preventDefault()}
-            aria-disabled="true"
-          >
+          <Link href="/forgot_password" className="forgot-password-link">
             Forgot Password?
-          </a>
+          </Link>
         </p>
 
         <button type="submit">Login</button>
