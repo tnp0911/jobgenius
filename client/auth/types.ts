@@ -15,3 +15,23 @@ export type AuthOptions = {
     timeout?: number;
     headers?: Record<string, string>;
 };
+
+export type UpdatePasswordRequest = {
+    oldPassword: string;
+    newPassword: string;
+};
+
+export type UpdatePasswordResponse = {
+    error?: string;
+    message?: string;
+};
+
+export type ForgotPasswordRequest = {
+    email: string;
+    newPassword: string;
+};
+
+export type ForgotPasswordResponse = {
+    error?: string;
+    message?: string;
+};

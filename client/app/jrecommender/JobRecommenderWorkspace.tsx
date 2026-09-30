@@ -498,9 +498,6 @@ export function JobRecommenderWorkspace() {
             <Link href="/login" className="mkt-btn mkt-btn-primary">
               Log in
             </Link>
-            <Link href="/register" className="mkt-btn mkt-btn-ghost">
-              Create account
-            </Link>
           </div>
         </aside>
       )}
