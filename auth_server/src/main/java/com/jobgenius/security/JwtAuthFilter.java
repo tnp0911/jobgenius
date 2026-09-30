@@ -32,7 +32,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String path = request.getServletPath();
-        if (path.startsWith("/auth/") || path.contains("/users/forgot-password")) { // Skip authentication for /auth/** endpoints and forgot-password endpoints
+        if (path.startsWith("/auth/")) { // Skip authentication for /auth/** endpoints
             filterChain.doFilter(request, response);
             return;
         }

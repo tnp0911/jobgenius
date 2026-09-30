@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/auth")
 public class PasswordModificationController {
     private final UserService userService;
     private final SecurityService securityService;
