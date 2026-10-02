@@ -26,7 +26,7 @@ public class UserController {
     private final UserService userService;
     private final SecurityService securityService;
 
-    private Logger logger = LoggerFactory.getLogger(UserController.class);
+    private final Logger logger = LoggerFactory.getLogger(UserController.class);
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/users")

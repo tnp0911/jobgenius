@@ -19,10 +19,9 @@ const NAV_LINKS = [
 ] as const;
 
 const PROFILE_LINKS = [
-  { label: "My Account", href: "/my_account" },
+  { label: "My Account", href: "/myaccount" },
   { label: "Settings & Privacy", href: "/settings_privacy" },
-  { label: "Usage & Billing", href: "/usage_billing" },
-  { label: "Help", href: "/help" }
+  { label: "Billing & Subscription", href: "/billing_subscription" }
 ] as const;
 
 function ProfileIcon() {
@@ -197,6 +196,11 @@ export function NavBar() {
             >
               Logout
             </button>
+            <div
+              className="site-version"
+            >
+              <p>v1.1.0-beta</p>
+            </div>
           </div>
         </div>
       );

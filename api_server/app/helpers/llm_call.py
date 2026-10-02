@@ -72,6 +72,7 @@ def safe_parse(response: str, agent_name="unknown"):
 
     # 4. Final fallback
     logger.error(f"[ERROR] {agent_name} returned invalid JSON")
+    logger.error(f"Response: {response}")
 
     return {
         "error": "Invalid JSON",

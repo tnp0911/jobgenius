@@ -1,0 +1,294 @@
+.account {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(3rem, 7vw, 4.75rem) 0 clamp(1.75rem, 4vw, 2.5rem);
+  background:
+    radial-gradient(ellipse 70% 55% at 10% 0%, rgba(37, 99, 235, 0.18), transparent 58%),
+    radial-gradient(ellipse 45% 40% at 92% 15%, rgba(14, 165, 233, 0.14), transparent 52%),
+    linear-gradient(180deg, #dbeafe 0%, #e6effc 55%, var(--page-bg) 100%);
+}
+
+.account-hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 78% 70% at 50% 20%, #000 25%, transparent 78%);
+  pointer-events: none;
+}
+
+.account-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+}
+
+.account-brand {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--brand);
+}
+
+.account-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3.2vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.account-support {
+  margin: 1rem 0 0;
+  max-width: 34rem;
+  font-size: 1.08rem;
+  color: var(--ink-soft);
+}
+
+.account-stage {
+  flex: 1;
+  padding: 0 0 clamp(3.5rem, 8vw, 5.5rem);
+}
+
+.account-stage-inner {
+  position: relative;
+}
+
+.account-layout {
+  display: grid;
+  grid-template-columns: 16.75rem minmax(0, 1fr);
+  gap: 1.35rem;
+  align-items: start;
+}
+
+.account-sidebar,
+.account-pane,
+.account-status {
+  padding: clamp(1.25rem, 3vw, 1.65rem);
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.88) 0%, rgba(239, 246, 255, 0.55) 100%);
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.06);
+}
+
+.account-sidebar-kicker,
+.account-pane-kicker {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+
+.account-sidebar-nav {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.account-sidebar-link {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.account-sidebar-link:hover {
+  color: var(--brand);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(37, 99, 235, 0.16);
+}
+
+.account-sidebar-link.is-active {
+  color: var(--brand);
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.account-pane-title {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.account-name-row .account-pane-title {
+  margin: 0;
+}
+
+.account-pane-lead {
+  margin: 0.55rem 0 0;
+  max-width: 40rem;
+  color: var(--ink-soft);
+  font-size: 1.02rem;
+}
+
+.account-profile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.15rem;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(14, 165, 233, 0.08) 55%, rgba(255, 255, 255, 0.72) 100%);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.account-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.8rem;
+  margin-top: 0.35rem;
+}
+
+.account-plan-badge {
+  margin: 0;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--brand);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.account-plan-badge.is-premium {
+  background: var(--brand);
+  color: #fff;
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.account-details {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.45rem 0 0;
+}
+
+.account-detail {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.account-detail-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.account-detail-value {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.account-profile-actions,
+.account-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.account-profile-actions .mkt-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.account-status {
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.account-status-error {
+  display: grid;
+  justify-items: center;
+  gap: 0.85rem;
+}
+
+.account-status-error p {
+  margin: 0;
+}
+
+.account-gate {
+  display: grid;
+  justify-items: start;
+  gap: 0.25rem;
+}
+
+@media (max-width: 860px) {
+  .account-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .account-sidebar-nav {
+    display: flex;
+    gap: 0.45rem;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+  }
+
+  .account-sidebar-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .account-profile-actions .mkt-btn,
+  .account-gate-actions .mkt-btn,
+  .account-status-error .mkt-btn {
+    width: 100%;
+  }
+}

@@ -1,0 +1,318 @@
+.billing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.billing-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(3rem, 7vw, 4.75rem) 0 clamp(1.75rem, 4vw, 2.5rem);
+  background:
+    radial-gradient(ellipse 70% 55% at 10% 0%, rgba(37, 99, 235, 0.18), transparent 58%),
+    radial-gradient(ellipse 45% 40% at 92% 15%, rgba(14, 165, 233, 0.14), transparent 52%),
+    linear-gradient(180deg, #dbeafe 0%, #e6effc 55%, var(--page-bg) 100%);
+}
+
+.billing-hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 78% 70% at 50% 20%, #000 25%, transparent 78%);
+  pointer-events: none;
+}
+
+.billing-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+}
+
+.billing-brand {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--brand);
+}
+
+.billing-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3.2vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.billing-support {
+  margin: 1rem 0 0;
+  max-width: 34rem;
+  font-size: 1.08rem;
+  color: var(--ink-soft);
+}
+
+.billing-stage {
+  flex: 1;
+  padding: 0 0 clamp(3.5rem, 8vw, 5.5rem);
+}
+
+.billing-stage-inner {
+  position: relative;
+}
+
+.billing-workspace {
+  display: grid;
+  gap: 1.35rem;
+}
+
+.billing-pane-kicker {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+
+.billing-pane-title {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.billing-pane-lead {
+  margin: 0.55rem 0 0;
+  max-width: 40rem;
+  color: var(--ink-soft);
+  font-size: 1.02rem;
+}
+
+.billing-plan,
+.billing-usage,
+.billing-gate,
+.billing-meter {
+  padding: clamp(1.25rem, 3vw, 1.65rem);
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.88) 0%, rgba(239, 246, 255, 0.55) 100%);
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.06);
+}
+
+.billing-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.billing-plan-aside {
+  display: grid;
+  justify-items: end;
+  gap: 0.75rem;
+}
+
+.billing-plan-badge {
+  margin: 0;
+  padding: 0.28rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--brand);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.billing-plan-badge.is-premium {
+  background: var(--brand);
+  color: #fff;
+}
+
+.billing-plan-price {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.billing-usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+}
+
+.billing-refresh {
+  flex-shrink: 0;
+}
+
+.billing-meter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.15rem;
+  margin-top: 1.35rem;
+}
+
+.billing-meter {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(239, 246, 255, 0.7) 100%);
+}
+
+.billing-meter-title {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+
+.billing-meter-window {
+  margin: 0.4rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.billing-meter-track {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  overflow: hidden;
+}
+
+.billing-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  min-width: 0;
+  transition: width 0.35s ease;
+}
+
+.billing-meter-fill.is-warm {
+  background: #d97706;
+}
+
+.billing-meter-fill.is-full {
+  background: #b91c1c;
+}
+
+.billing-meter-stats {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.billing-meter-count {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+}
+
+.billing-meter-count strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.billing-meter-left {
+  margin: 0;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.billing-meter-left.is-empty {
+  color: #b91c1c;
+}
+
+.billing-meter-reset {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.billing-meter-link {
+  justify-self: start;
+}
+
+.billing-status,
+.billing-gate {
+  margin-top: 0;
+}
+
+.billing-status {
+  margin: 1.35rem 0 0;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--ink-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.billing-status-error {
+  display: grid;
+  justify-items: center;
+  gap: 0.85rem;
+}
+
+.billing-status-error p {
+  margin: 0;
+}
+
+.billing-gate {
+  display: grid;
+  justify-items: start;
+  gap: 0.25rem;
+}
+
+.billing-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.15rem;
+}
+
+@media (max-width: 860px) {
+  .billing-meter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-plan-aside {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .billing-plan-aside .mkt-btn,
+  .billing-refresh,
+  .billing-gate-actions .mkt-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .billing-meter-fill {
+    transition: none;
+  }
+}

@@ -299,6 +299,14 @@
   color: #991b1b;
 }
 
+.site-version {
+  text-align: left;
+  font-size: x-small;
+  font-weight: lighter;
+  margin-left: 3px;
+  margin-bottom: 1px;
+}
+
 body.navbar-menu-lock {
   overflow: hidden;
 }

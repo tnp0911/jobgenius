@@ -21,9 +21,9 @@ async def get_analyzer_usage_endpoint(
     try:
         if not current_user:
             raise HTTPException(status_code=401, detail="Unauthorized")
-        usage, remaining_time = await get_analyzer_usage(current_user, is_premium_user)
+        usage, remaining_time, max_analyzer_limit = await get_analyzer_usage(current_user, is_premium_user)
         return JSONResponse(
-            content={"usage": usage, "remaining_time": remaining_time},
+            content={"usage": usage, "remaining_time": remaining_time, "max_limit": max_analyzer_limit},
             status_code=status.HTTP_200_OK,
         )
     except HTTPException:
@@ -43,11 +43,11 @@ async def get_job_finder_usage_endpoint(
     try:
         if not current_user:
             raise HTTPException(status_code=401, detail="Unauthorized")
-        usage, remaining_time = await get_job_finder_usage(
+        usage, remaining_time, max_job_finder_limit = await get_job_finder_usage(
             current_user, is_premium_user
         )
         return JSONResponse(
-            content={"usage": usage, "remaining_time": remaining_time},
+            content={"usage": usage, "remaining_time": remaining_time, "max_limit": max_job_finder_limit},
             status_code=status.HTTP_200_OK,
         )
     except HTTPException:

@@ -1,5 +1,7 @@
+"use client";
 import Link from "next/link";
 import "./footer.css";
+import { useAuth } from "@/contexts/AuthContext";
 
 const PRODUCT_LINKS = [
   { label: "Resume Analyzer", href: "/resume-analyzer" },
@@ -19,6 +21,7 @@ const ACCOUNT_LINKS = [
 ] as const;
 
 export function Footer() {
+  const { status } = useAuth();
   const year = new Date().getFullYear();
 
   return (
@@ -60,11 +63,15 @@ export function Footer() {
           <div className="site-footer-col">
             <h3>Account</h3>
             <ul>
-              {ACCOUNT_LINKS.map(({ label, href }) => (
+              {status === "unauthenticated" ? ACCOUNT_LINKS.map(({ label, href }) => (
                 <li key={href}>
                   <Link href={href}>{label}</Link>
                 </li>
-              ))}
+              )) : (
+                <li key={"/myaccount"}>
+                  <Link href={"/myaccount"}>My Account</Link>
+                </li>
+              )}
             </ul>
           </div>
         </div>
@@ -72,8 +79,7 @@ export function Footer() {
 
       <div className="site-footer-bottom">
         <p>
-          &copy; {year === 2026 ? "2026" : `2026–${year}`} JobGenius. All
-          rights reserved.
+          &copy; {year === 2026 ? "2026" : `2026–${year}`} JobGenius. All rights reserved.
         </p>
         <p className="site-footer-note">Built for job seekers who want signal, not noise.</p>
       </div>

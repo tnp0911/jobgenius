@@ -153,8 +153,12 @@ async def search_jobs_in_pinecone(query: str) -> List[dict]:
         pinecone_index = get_pinecone_index()
         embedding = await embed_text(query)
         if not embedding:
+            logger.error("Empty embedding")
             return []
-
+        total_ids = 0
+        async for ids_batch in pinecone_index.list(namespace="jobs"):
+            total_ids += len(ids_batch)
+        logger.info(f"Total IDs in Pinecone: {total_ids}")
         results = await pinecone_index.query(
             vector=embedding,
             top_k=20,
@@ -163,6 +167,7 @@ async def search_jobs_in_pinecone(query: str) -> List[dict]:
         )
         matches = results.get("matches", [])
         if not matches:
+            logger.error("No matches found in Pinecone")
             return []
         return matches
     except Exception as e:
@@ -229,6 +234,9 @@ async def job_recommendation_with_pinecone(user_id: int, resume_id: str, job_cit
             if not job_id:
                 continue
             job = await get_job_from_mongodb(job_id)
+            if not job:
+                logger.error(f"Job not found in MongoDB: {job_id}")
+                continue
             if job and job.get("is_active", True):
                 recommended_jobs.append({"job": job, "match_score": match["score"]})
         if not recommended_jobs:
