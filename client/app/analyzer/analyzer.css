@@ -123,6 +123,28 @@
   line-height: 1.45;
 }
 
+.analyzer-status {
+  display: grid;
+  justify-items: start;
+  gap: 0.85rem;
+  padding: clamp(1.25rem, 3vw, 1.65rem);
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.88) 0%, rgba(239, 246, 255, 0.55) 100%);
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.06);
+  color: var(--ink-soft);
+}
+
+.analyzer-status .analyzer-pane-title {
+  margin: 0;
+}
+
+.analyzer-status[aria-busy="true"] {
+  justify-items: center;
+  text-align: center;
+}
+
 .analyzer-split-rule {
   display: flex;
   align-items: center;

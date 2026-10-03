@@ -20,12 +20,26 @@ const STATUS_LINES = [
 
 type AnalyzerLoadingProps = {
   fileName?: string;
+  /** When set (0–100), drives the ring instead of the fake timer. */
+  progress?: number;
+  statusText?: string;
 };
 
-export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
+export function AnalyzerLoading({
+  fileName,
+  progress: progressProp,
+  statusText,
+}: AnalyzerLoadingProps) {
+  const controlled = typeof progressProp === "number";
   const [disclaimerIndex, setDisclaimerIndex] = useState(0);
   const [statusIndex, setStatusIndex] = useState(0);
-  const [progress, setProgress] = useState(8);
+  const [progress, setProgress] = useState(controlled ? progressProp : 8);
+
+  useEffect(() => {
+    if (controlled) {
+      setProgress(Math.min(100, Math.max(0, progressProp)));
+    }
+  }, [controlled, progressProp]);
 
   useEffect(() => {
     const disclaimerTimer = window.setInterval(() => {
@@ -36,19 +50,26 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
       setStatusIndex((i) => (i + 1) % STATUS_LINES.length);
     }, 3000);
 
-    const progressTimer = window.setInterval(() => {
-      setProgress((p) => {
-        if (p >= 92) return 88 + Math.random() * 4;
-        return Math.min(92, p + 2 + Math.random() * 5);
-      });
-    }, 1500);
+    let progressTimer: number | undefined;
+    if (!controlled) {
+      progressTimer = window.setInterval(() => {
+        setProgress((p) => {
+          if (p >= 92) return 88 + Math.random() * 4;
+          return Math.min(92, p + 2 + Math.random() * 5);
+        });
+      }, 1500);
+    }
 
     return () => {
       window.clearInterval(disclaimerTimer);
       window.clearInterval(statusTimer);
-      window.clearInterval(progressTimer);
+      if (progressTimer !== undefined) {
+        window.clearInterval(progressTimer);
+      }
     };
-  }, []);
+  }, [controlled]);
+
+  const shownProgress = Math.round(progress);
 
   return (
     <div className="analyzer-loading" aria-busy="true" aria-live="polite">
@@ -59,14 +80,16 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
           Analyzing <span>{fileName}</span>
         </p>
       ) : null}
-      <p className="analyzer-loading-status">{STATUS_LINES[statusIndex]}</p>
+      <p className="analyzer-loading-status">
+        {statusText ?? STATUS_LINES[statusIndex]}
+      </p>
 
       <div
         className="analyzer-loading-ring"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(progress)}
+        aria-valuenow={shownProgress}
         aria-label="Analysis progress"
       >
         <svg viewBox="0 0 120 120" className="analyzer-loading-ring-svg" aria-hidden="true">
@@ -78,11 +101,11 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
             r="52"
             style={{
               strokeDasharray: `${2 * Math.PI * 52}`,
-              strokeDashoffset: `${2 * Math.PI * 52 * (1 - progress / 100)}`,
+              strokeDashoffset: `${2 * Math.PI * 52 * (1 - shownProgress / 100)}`,
             }}
           />
         </svg>
-        <span className="analyzer-loading-ring-label">{Math.round(progress)}%</span>
+        <span className="analyzer-loading-ring-label">{shownProgress}%</span>
       </div>
 
       <div className="analyzer-loading-disclaimer">
@@ -100,7 +123,9 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
       </div>
 
       <p className="analyzer-loading-footnote">
-        Hang tight — this usually takes under a minute. Keep this tab open.
+        {controlled
+          ? "Premium analysis can take a bit longer. Keep this tab open while we stream progress."
+          : "Hang tight — this usually takes under a minute. Keep this tab open."}
       </p>
     </div>
   );
