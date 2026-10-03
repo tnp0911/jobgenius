@@ -1,9 +1,12 @@
 "use client";
 
-import type { FreeAnalyzeResult } from "@/services/resumeService";
+import type {
+  FreeAnalyzeResult,
+  PremiumAnalyzeResult,
+} from "@/services/resumeService";
 
 type AnalyzerResultsProps = {
-  result: FreeAnalyzeResult;
+  result: FreeAnalyzeResult | PremiumAnalyzeResult;
   onAnalyzeAgain: () => void;
 };
 
