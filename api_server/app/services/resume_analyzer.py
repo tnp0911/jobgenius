@@ -3,8 +3,6 @@ import re
 from datetime import datetime
 
 import pymupdf
-from fastapi import UploadFile
-
 from app.helpers.resume_helper import (
     match_variants,
     normalize_text,
@@ -17,6 +15,7 @@ from app.internal_db.skills import (
     SOFT_SKILL_NORMALIZATION,
 )
 from app.services.jd import extract_skills_from_jd_text
+from fastapi import UploadFile
 
 _HTTP_URL_PATTERN = re.compile(r"https?://[^\s<>\"'\)\],]+", re.IGNORECASE)
 _BARE_PROFILE_URL_PATTERN = re.compile(
@@ -56,12 +55,9 @@ async def convert_file_to_bytes(file: UploadFile) -> bytes:
         raise ValueError("Error converting file to bytes.")
 
 
-def extract_text_from_resume(resume_pdf_file, resume_bytes: bytes) -> str:
+def extract_text_from_resume(filename: str, resume_bytes: bytes) -> str:
     try:
-        if (
-            not resume_pdf_file.filename
-            or not resume_pdf_file.filename.lower().endswith(".pdf")
-        ):
+        if not filename or not filename.lower().endswith(".pdf"):
             raise ValueError("Unsupported file format. Please upload a PDF.")
 
         doc = pymupdf.open(stream=resume_bytes, filetype="pdf")
@@ -71,10 +67,10 @@ def extract_text_from_resume(resume_pdf_file, resume_bytes: bytes) -> str:
         doc.close()
         return text
     except FileNotFoundError as e:
-        logger.error(f"File not found: {resume_pdf_file.filename}")
+        logger.error(f"File not found: {filename}")
         raise e
     except ValueError as e:
-        logger.error(f"Unsupported file format: {resume_pdf_file.filename}")
+        logger.error(f"Unsupported file format: {filename}")
         raise e
     except Exception as e:
         logger.error(f"Error extracting text from resume: {e}")

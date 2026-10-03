@@ -1,12 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   freeAnalyzeResume,
-  premiumAnalyzeResume,
+  premiumAnalyzeResumeRequest,
   type FreeAnalyzeResult,
-  type PremiumAnalyzeResult,
 } from "@/services/resumeService";
 import { ResumeDropzone } from "./ResumeDropzone";
 import { JobBriefPanel } from "./JobBriefPanel";
@@ -18,13 +18,14 @@ import { AuthOptions } from "@/auth/types";
 type Phase = "idle" | "loading" | "done";
 
 export function AnalyzerWorkspace() {
+  const router = useRouter();
   const { status, tier } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [requirements, setRequirements] = useState("");
   const [includesJobFinder, setIncludesJobFinder] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
-  const [result, setResult] = useState<FreeAnalyzeResult | PremiumAnalyzeResult | null>(null);
+  const [result, setResult] = useState<FreeAnalyzeResult | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function AnalyzerWorkspace() {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    
+
     if (!file) {
       toast.error("Upload a PDF resume first.");
       return;
@@ -62,22 +63,41 @@ export function AnalyzerWorkspace() {
           requirements.trim(),
           options,
         );
-        setResult(data as FreeAnalyzeResult);
-        setPhase("done");
-      } else {
-        const data = await premiumAnalyzeResume(
-          file,
-          jobDescription.trim(),
-          requirements.trim(),
-          includesJobFinder,
-          options,
-        );
         if (controller.signal.aborted || controllerRef.current !== controller) return;
-        if (!data) { setPhase("idle"); return; } // if services keep returning null
-
-        setResult(data as PremiumAnalyzeResult);
+        if (!data) {
+          setPhase("idle");
+          return;
+        }
+        setResult(data);
         setPhase("done");
+        return;
       }
+
+      const data = await premiumAnalyzeResumeRequest(
+        file,
+        jobDescription.trim(),
+        requirements.trim(),
+        includesJobFinder,
+        options,
+      );
+      if (controller.signal.aborted || controllerRef.current !== controller) return;
+      if (!data?.job_id) {
+        setPhase("idle");
+        if (data && !data.job_id) {
+          toast.error("Failed to start analysis. Please try again later.");
+        }
+        return;
+      }
+
+      if (data.message) {
+        toast.warning(data.message);
+      }
+
+      if (typeof window !== "undefined" && file.name) {
+        sessionStorage.setItem(`analyzer_file_${data.job_id}`, file.name);
+      }
+
+      router.push(`/analyzer/waiting/${data.job_id}`);
     } catch (error) {
       if (controller.signal.aborted || controllerRef.current !== controller) return;
       const message =
