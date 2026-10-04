@@ -37,6 +37,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StripePaymentService extends PaymentService {
     private static final String SUBSCRIPTION_META_KEY = "Stripe_SubscriptionId";
+    private static final String USER_ID_META_KEY = "userId";
     private static final DateTimeFormatter ISO_OFFSET = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     private final Logger logger = LoggerFactory.getLogger(StripePaymentService.class);
@@ -59,91 +60,52 @@ public class StripePaymentService extends PaymentService {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new Exception("User not found"));
 
-        SessionCreateParams params;
-        if (paymentMetadataRepository.existsFreeTrialByUserId(user.getUid()) > 0) {
-            params = SessionCreateParams.builder()
-                    .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-                    .setUiMode(SessionCreateParams.UiMode.HOSTED_PAGE)
-                    .setSuccessUrl(req.getSuccessUrl())
-                    .setCancelUrl(req.getCancelUrl())
-                    .setCustomerEmail(user.getEmail())
-                    .setBillingAddressCollection(SessionCreateParams.BillingAddressCollection.AUTO)
-                    .setPaymentMethodCollection(SessionCreateParams.PaymentMethodCollection.ALWAYS)
-                    .setAllowPromotionCodes(true)
-                    .setNameCollection(
-                            SessionCreateParams.NameCollection.builder()
-                                    .setBusiness(
-                                            SessionCreateParams.NameCollection.Business.builder()
-                                                    .setEnabled(true)
-                                                    .setOptional(true)
-                                                    .build()
-                                    )
-                                    .build()
-                    )
-                    .setSubmitType(SessionCreateParams.SubmitType.AUTO)
-                    .setIntegrationIdentifier("hosted_web_0001")
-                    .putMetadata("userId", user.getUid().toString())
-                    .addLineItem(
-                            SessionCreateParams.LineItem.builder()
-                                    .setQuantity(1L)
-                                    .setPrice(stripePriceId)
-                                    .build())
-                    .setSavedPaymentMethodOptions(
-                            SessionCreateParams.SavedPaymentMethodOptions.builder()
-                                    .setPaymentMethodSave(
-                                            SessionCreateParams.SavedPaymentMethodOptions.PaymentMethodSave.ENABLED
-                                    )
-                                    .build()
-                    )
-                    .setOriginContext(SessionCreateParams.OriginContext.WEB)
-                    .build();
+        String userId = user.getUid().toString();
+        boolean alreadyUsedFreeTrial = paymentMetadataRepository.existsFreeTrialByUserId(user.getUid()) > 0;
+
+        // userId must live on subscription_data.metadata — invoice.metadata is NOT copied from the session.
+        SessionCreateParams.SubscriptionData.Builder subscriptionData =
+                SessionCreateParams.SubscriptionData.builder()
+                        .putMetadata(USER_ID_META_KEY, userId);
+        if (!alreadyUsedFreeTrial) {
+            subscriptionData.setTrialPeriodDays(14L);
         }
-        else {
-            params = SessionCreateParams.builder()
-                    .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-                    .setUiMode(SessionCreateParams.UiMode.HOSTED_PAGE)
-                    .setSuccessUrl(req.getSuccessUrl())
-                    .setCancelUrl(req.getCancelUrl())
-                    .setCustomerEmail(user.getEmail())
-                    .setBillingAddressCollection(SessionCreateParams.BillingAddressCollection.AUTO)
-                    .setPaymentMethodCollection(SessionCreateParams.PaymentMethodCollection.ALWAYS)
-                    .setAllowPromotionCodes(true)
-                    .setNameCollection(
-                            SessionCreateParams.NameCollection.builder()
-                                    .setBusiness(
-                                            SessionCreateParams.NameCollection.Business.builder()
-                                                    .setEnabled(true)
-                                                    .setOptional(true)
-                                                    .build()
-                                    )
-                                    .build()
-                    )
-                    .setSubmitType(SessionCreateParams.SubmitType.AUTO)
-                    .setIntegrationIdentifier("hosted_web_0001")
-                    .setSubscriptionData(
-                            SessionCreateParams.SubscriptionData.builder()
-                                    .setTrialPeriodDays(14L)
-                                    .putMetadata("userId", user.getUid().toString())
-                                    .build())
-                    .putMetadata("userId", user.getUid().toString())
-                    .addLineItem(
-                            SessionCreateParams.LineItem.builder()
-                                    .setQuantity(1L)
-                                    .setPrice(stripePriceId)
-                                    .build())
-                    .setSavedPaymentMethodOptions(
-                            SessionCreateParams.SavedPaymentMethodOptions.builder()
-                                    .setPaymentMethodSave(
-                                            SessionCreateParams.SavedPaymentMethodOptions.PaymentMethodSave.ENABLED
-                                    )
-                                    .build()
-                    )
-                    .setOriginContext(SessionCreateParams.OriginContext.WEB)
-                    .build();
-        }
+
+        SessionCreateParams params = SessionCreateParams.builder()
+                .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
+                .setUiMode(SessionCreateParams.UiMode.HOSTED_PAGE)
+                .setSuccessUrl(req.getSuccessUrl())
+                .setCancelUrl(req.getCancelUrl())
+                .setCustomerEmail(user.getEmail())
+                .setBillingAddressCollection(SessionCreateParams.BillingAddressCollection.AUTO)
+                .setPaymentMethodCollection(SessionCreateParams.PaymentMethodCollection.ALWAYS)
+                .setAllowPromotionCodes(true)
+                .setNameCollection(
+                        SessionCreateParams.NameCollection.builder()
+                                .setBusiness(
+                                        SessionCreateParams.NameCollection.Business.builder()
+                                                .setEnabled(true)
+                                                .setOptional(true)
+                                                .build())
+                                .build())
+                .setSubmitType(SessionCreateParams.SubmitType.AUTO)
+                .setIntegrationIdentifier("hosted_web_0001")
+                .setSubscriptionData(subscriptionData.build())
+                .putMetadata(USER_ID_META_KEY, userId)
+                .addLineItem(
+                        SessionCreateParams.LineItem.builder()
+                                .setQuantity(1L)
+                                .setPrice(stripePriceId)
+                                .build())
+                .setSavedPaymentMethodOptions(
+                        SessionCreateParams.SavedPaymentMethodOptions.builder()
+                                .setPaymentMethodSave(
+                                        SessionCreateParams.SavedPaymentMethodOptions.PaymentMethodSave.ENABLED)
+                                .build())
+                .setOriginContext(SessionCreateParams.OriginContext.WEB)
+                .build();
 
         Session session = Session.create(params);
-
         return session.getUrl();
     }
 
@@ -167,7 +129,6 @@ public class StripePaymentService extends PaymentService {
             throws JsonProcessingException, EventDataObjectDeserializationException {
 
         String endpointSecret = stripeEndpointSecretKey;
-        // move this to application properties or environment variable in production
         Event event;
         try {
             event = Webhook.constructEvent(payload, sigHeader, endpointSecret);
@@ -176,23 +137,23 @@ public class StripePaymentService extends PaymentService {
         }
         switch (event.getType()) {
             /**
-             * 🔥 1. Checkout completed (FIRST TIME subscription)
+             * Seed user ↔ subscription mapping before invoice.paid (invoice.metadata is usually empty).
              */
             case "checkout.session.completed": {
                 EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
-
                 Session session;
                 if (deserializer.getObject().isPresent()) {
                     session = (Session) deserializer.getObject().get();
                 } else {
                     session = (Session) deserializer.deserializeUnsafe();
                 }
-                logger.info("Received checkout.session.completed event for session: " + session.getId());
+                if (session != null) {
+                    handleCheckoutSessionCompleted(session);
+                }
                 break;
             }
             /**
-             * 🔁 2. Invoice paid (renewal or successful Smart Retry).
-             * Restores / extends PREMIUM from Stripe current_period_end.
+             * Invoice paid (trial $0, first charge, renewal, or Smart Retry success).
              */
             case "invoice.paid": {
                 Invoice invoice = deserializeInvoice(event);
@@ -204,7 +165,7 @@ public class StripePaymentService extends PaymentService {
             }
 
             /**
-             * ❌ 3. Invoice payment failed — Stripe will Smart-Retry.
+             * Invoice payment failed — Stripe will Smart-Retry.
              * Record FAILED only; keep PREMIUM until subscription is deleted.
              */
             case "invoice.payment_failed": {
@@ -217,7 +178,7 @@ public class StripePaymentService extends PaymentService {
             }
 
             /**
-             * 🚫 4. Subscription fully canceled (including after all retries fail)
+             * Subscription fully canceled (including after all retries fail)
              */
             case "customer.subscription.deleted": {
                 EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
@@ -267,14 +228,85 @@ public class StripePaymentService extends PaymentService {
                 break;
             }
             default: {
-                // Ignore other events
                 break;
             }
         }
     }
 
+    private void handleCheckoutSessionCompleted(Session session) {
+        String subscriptionId = session.getSubscription();
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            logger.warn("checkout.session.completed {}: no subscription id", session.getId());
+            return;
+        }
+
+        // Prefer session metadata; fall back to subscription metadata (authoritative for invoices).
+        String uidStr = metadataUserId(session.getMetadata());
+        if (uidStr == null || uidStr.isBlank()) {
+            try {
+                Subscription subscription = Subscription.retrieve(subscriptionId);
+                uidStr = metadataUserId(subscription.getMetadata());
+            } catch (Exception e) {
+                logger.warn(
+                        "checkout.session.completed {}: could not load subscription {}: {}",
+                        session.getId(),
+                        subscriptionId,
+                        e.getMessage());
+            }
+        }
+
+        if (uidStr == null || uidStr.isBlank()) {
+            logger.error(
+                    "checkout.session.completed {}: missing userId on session and subscription {}",
+                    session.getId(),
+                    subscriptionId);
+            return;
+        }
+
+        PaymentMetadata existing =
+                paymentMetadataRepository.findByKeyAndValue(SUBSCRIPTION_META_KEY, subscriptionId);
+        if (existing != null) {
+            logger.info(
+                    "checkout.session.completed {}: subscription {} already mapped",
+                    session.getId(),
+                    subscriptionId);
+            return;
+        }
+
+        Long uid = Long.parseLong(uidStr);
+        User user = userRepository.findById(uid)
+                .orElseThrow(() -> new RuntimeException("User not found: " + uid));
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String paymentRef = "checkout:" + session.getId();
+        Payment payment = paymentRepository.findByProviderPaymentRef(paymentRef).orElseGet(Payment::new);
+        if (payment.getPaymentId() == null) {
+            payment.setUser(user);
+            payment.setProvider("STRIPE");
+            payment.setProviderPaymentRef(paymentRef);
+            payment.setStatus(PaymentStatus.PENDING);
+            payment.setCreatedAt(now);
+        }
+        payment.setUpdatedAt(now);
+        paymentRepository.saveAndFlush(payment);
+
+        // amount=1 placeholder so this seed row is not counted as a free-trial (amount=0) invoice.
+        upsertSubscriptionMetadata(
+                payment,
+                subscriptionId,
+                1L,
+                "cad",
+                now.plusDays(30));
+
+        logger.info(
+                "checkout.session.completed {}: mapped user {} → subscription {}",
+                session.getId(),
+                uid,
+                subscriptionId);
+    }
+
     private void handleInvoicePaid(Invoice invoice) {
-        String subscriptionId = invoice.getParent().getSubscriptionDetails().getSubscription();
+        String subscriptionId = subscriptionIdOf(invoice);
         if (subscriptionId == null || subscriptionId.isBlank()) {
             logger.warn("invoice.paid {} has no subscription; skipping", invoice.getId());
             return;
@@ -310,7 +342,7 @@ public class StripePaymentService extends PaymentService {
     }
 
     private void handleInvoicePaymentFailed(Invoice invoice) {
-        String subscriptionId = invoice.getParent().getSubscriptionDetails().getSubscription();
+        String subscriptionId = subscriptionIdOf(invoice);
         if (subscriptionId == null || subscriptionId.isBlank()) {
             logger.warn("invoice.payment_failed {} has no subscription; skipping", invoice.getId());
             return;
@@ -361,23 +393,31 @@ public class StripePaymentService extends PaymentService {
         return (Invoice) deserializer.deserializeUnsafe();
     }
 
+    /**
+     * Invoice.metadata is usually empty for subscription invoices.
+     * Resolve userId from: subscription.metadata → DB mapping → invoice.metadata (last resort).
+     */
     private User resolveUserForInvoice(Invoice invoice, String subscriptionId) {
-        String uidStr = metadataUserId(invoice.getMetadata());
+        String uidStr = null;
 
-        if (uidStr == null || uidStr.isBlank()) {
-            try {
-                Subscription subscription = Subscription.retrieve(subscriptionId);
-                uidStr = resolveUserIdFromSubscription(subscription);
-            } catch (Exception e) {
-                logger.warn("Could not load subscription {} for user resolve: {}", subscriptionId, e.getMessage());
-            }
+        try {
+            Subscription subscription = Subscription.retrieve(subscriptionId);
+            uidStr = resolveUserIdFromSubscription(subscription);
+        } catch (Exception e) {
+            logger.warn("Could not load subscription {} for user resolve: {}", subscriptionId, e.getMessage());
         }
 
         if (uidStr == null || uidStr.isBlank()) {
-            PaymentMetadata bySub = paymentMetadataRepository.findByKeyAndValue(SUBSCRIPTION_META_KEY, subscriptionId);
+            PaymentMetadata bySub =
+                    paymentMetadataRepository.findByKeyAndValue(SUBSCRIPTION_META_KEY, subscriptionId);
             if (bySub != null && bySub.getPayment() != null && bySub.getPayment().getUser() != null) {
                 return bySub.getPayment().getUser();
             }
+        }
+
+        // Rare: only if something explicitly set invoice metadata
+        if (uidStr == null || uidStr.isBlank()) {
+            uidStr = metadataUserId(invoice.getMetadata());
         }
 
         if (uidStr == null || uidStr.isBlank()) {
@@ -406,10 +446,21 @@ public class StripePaymentService extends PaymentService {
         if (metadata == null) {
             return null;
         }
-        return metadata.get("userId");
+        return metadata.get(USER_ID_META_KEY);
     }
 
-    /** Prefer PaymentIntent; fall back to invoice id (trials / $0 invoices). */
+    private static String subscriptionIdOf(Invoice invoice) {
+        if (invoice.getParent() == null
+                || invoice.getParent().getSubscriptionDetails() == null) {
+            return null;
+        }
+        String subscriptionId = invoice.getParent().getSubscriptionDetails().getSubscription();
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            return null;
+        }
+        return subscriptionId;
+    }
+
     private static String paymentRefForInvoice(Invoice invoice) {
         return "invoice:" + invoice.getId();
     }
@@ -433,12 +484,21 @@ public class StripePaymentService extends PaymentService {
     }
 
     private static OffsetDateTime periodEndOf(Invoice invoice) {
-        if (invoice.getLines().getData().get(0).getPeriod().getEnd() == null) {
-            return OffsetDateTime.now(ZoneOffset.UTC).plusDays(30);
+        try {
+            if (invoice.getLines() != null
+                    && invoice.getLines().getData() != null
+                    && !invoice.getLines().getData().isEmpty()
+                    && invoice.getLines().getData().get(0).getPeriod() != null
+                    && invoice.getLines().getData().get(0).getPeriod().getEnd() != null) {
+                return OffsetDateTime.ofInstant(
+                        java.time.Instant.ofEpochSecond(
+                                invoice.getLines().getData().get(0).getPeriod().getEnd()),
+                        ZoneOffset.UTC);
+            }
+        } catch (Exception ignored) {
+            // fall through
         }
-        return OffsetDateTime.ofInstant(
-                java.time.Instant.ofEpochSecond(invoice.getLines().getData().get(0).getPeriod().getEnd()),
-                ZoneOffset.UTC);
+        return OffsetDateTime.now(ZoneOffset.UTC).plusDays(30);
     }
 
     private static String formatPlanExpiry(OffsetDateTime periodEnd) {
