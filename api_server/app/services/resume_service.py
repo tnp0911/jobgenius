@@ -157,7 +157,7 @@ async def get_resumes_from_mongodb(user_id: int):
                     "resume_id": response["resume_id"],
                     "version": response["version"],
                     "filename": response["filename"],
-                    "storage_path": f"{settings.LOCALSTACK_HOST}/{settings.S3_BUCKET_NAME}/{response["storage_path"]}",
+                    "storage_path": f"{settings.LOCALSTACK_HOST}/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
                 }
             )
         return resumes
@@ -189,7 +189,7 @@ async def get_resume_by_id_and_version_from_mongodb(
             "resume_id": response["resume_id"],
             "version": response["version"],
             "filename": response["filename"],
-            "storage_path": f"{settings.LOCALSTACK_HOST}/{settings.S3_BUCKET_NAME}/{response["storage_path"]}",
+            "storage_path": f"{settings.LOCALSTACK_HOST}/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
             "analysis": analysis.model_dump(mode="json"),
         }
     except ValueError:
@@ -215,7 +215,7 @@ async def get_resume_by_id_from_mongodb(user_id: int, resume_id: str):
                     "resume_id": response["resume_id"],
                     "version": response["version"],
                     "filename": response["filename"],
-                    "storage_path": f"{settings.LOCALSTACK_HOST}/{settings.S3_BUCKET_NAME}/{response["storage_path"]}",
+                    "storage_path": f"{settings.LOCALSTACK_HOST}/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
                 }
             )
         if not resumes:
