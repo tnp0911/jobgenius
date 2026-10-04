@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const DISCLAIMERS = [
   "This resume analyzer is for general guidance — not a guarantee of interviews or offers.",
@@ -20,7 +20,10 @@ const STATUS_LINES = [
 
 type AnalyzerLoadingProps = {
   fileName?: string;
-  /** When set (0–100), drives the ring instead of the fake timer. */
+  /**
+   * Server/SSE progress (0–100). Used as a floor; the ring still eases upward
+   * with a fake timer so mid-analysis doesn't look frozen between events.
+   */
   progress?: number;
   statusText?: string;
 };
@@ -31,15 +34,21 @@ export function AnalyzerLoading({
   statusText,
 }: AnalyzerLoadingProps) {
   const controlled = typeof progressProp === "number";
+  const serverFloor = controlled
+    ? Math.min(100, Math.max(0, progressProp))
+    : 0;
+  const serverFloorRef = useRef(serverFloor);
+  serverFloorRef.current = serverFloor;
+
   const [disclaimerIndex, setDisclaimerIndex] = useState(0);
   const [statusIndex, setStatusIndex] = useState(0);
-  const [progress, setProgress] = useState(controlled ? progressProp : 8);
+  const [progress, setProgress] = useState(controlled ? serverFloor : 8);
 
+  // Snap up when SSE reports a higher value; never drop below the server floor.
   useEffect(() => {
-    if (controlled) {
-      setProgress(Math.min(100, Math.max(0, progressProp)));
-    }
-  }, [controlled, progressProp]);
+    if (!controlled) return;
+    setProgress((p) => Math.max(p, serverFloor));
+  }, [controlled, serverFloor]);
 
   useEffect(() => {
     const disclaimerTimer = window.setInterval(() => {
@@ -50,22 +59,34 @@ export function AnalyzerLoading({
       setStatusIndex((i) => (i + 1) % STATUS_LINES.length);
     }, 3000);
 
-    let progressTimer: number | undefined;
-    if (!controlled) {
-      progressTimer = window.setInterval(() => {
-        setProgress((p) => {
-          if (p >= 92) return 88 + Math.random() * 4;
-          return Math.min(92, p + 2 + Math.random() * 5);
-        });
-      }, 1500);
-    }
+    const progressTimer = window.setInterval(() => {
+      const floor = serverFloorRef.current;
+      setProgress((p) => {
+        // Done — lock to 100 once the server says so.
+        if (controlled && floor >= 100) return 100;
+
+        // Mid-analysis: ease slowly so the ring keeps moving.
+        if (p >= 30 && p <= 89) {
+          const next = p + 1.2 + Math.random() * 2.5;
+          // Controlled: don't race ahead of reality past ~94 until SSE catches up.
+          if (controlled) return Math.min(94, Math.max(next, floor));
+          return next;
+        }
+
+        if (p >= 92) {
+          if (controlled) return Math.max(floor, Math.min(96, p));
+          return 88 + Math.random() * 4;
+        }
+
+        const next = Math.min(92, p + 2 + Math.random() * 5);
+        return controlled ? Math.max(next, floor) : next;
+      });
+    }, 3000);
 
     return () => {
       window.clearInterval(disclaimerTimer);
       window.clearInterval(statusTimer);
-      if (progressTimer !== undefined) {
-        window.clearInterval(progressTimer);
-      }
+      window.clearInterval(progressTimer);
     };
   }, [controlled]);
 

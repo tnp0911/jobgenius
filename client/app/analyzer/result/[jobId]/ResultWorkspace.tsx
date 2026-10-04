@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { PremiumAnalyzeResult } from "@/services/resumeService";
+import { premiumAnalyzeResumeResult } from "@/services/resumeService";
 import { AnalyzerResults } from "../../AnalyzerResults";
-
-const RESULT_STORAGE_PREFIX = "analyzer_result_";
 
 export function ResultWorkspace() {
   const params = useParams<{ jobId: string }>();
@@ -20,19 +19,16 @@ export function ResultWorkspace() {
       setMissing(true);
       return;
     }
-
-    const raw = sessionStorage.getItem(`${RESULT_STORAGE_PREFIX}${jobId}`);
-    if (!raw) {
-      setMissing(true);
-      return;
-    }
-
-    try {
-      setResult(JSON.parse(raw) as PremiumAnalyzeResult);
-    } catch {
-      setMissing(true);
-    }
-  }, [jobId]);
+    const fetchResult = async () => {
+      try {
+        const result = await premiumAnalyzeResumeResult(jobId);
+        setResult(result);
+      } catch (error) {
+        setMissing(true);
+      }
+    };
+    fetchResult();
+  }, [jobId, setMissing, setResult]);
 
   if (missing) {
     return (
@@ -62,8 +58,7 @@ export function ResultWorkspace() {
     <AnalyzerResults
       result={result}
       onAnalyzeAgain={() => {
-        sessionStorage.removeItem(`${RESULT_STORAGE_PREFIX}${jobId}`);
-        router.push("/analyzer");
+        router.replace("/analyzer");
       }}
     />
   );

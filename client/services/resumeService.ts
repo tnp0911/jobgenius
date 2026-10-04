@@ -87,8 +87,6 @@ export type PremiumAnalyzeProgressEvent = {
   job_id: string;
   status: string;
   progress: number;
-  result?: PremiumAnalyzeResult;
-  message?: string;
   error?: string;
 };
 
@@ -135,7 +133,7 @@ export function premiumAnalyzeResumeSSE(
       }
       if (status === "FAILED") {
         const message =
-          data.message || data.error || "Analysis failed. Please try again later.";
+          data.error || "Analysis failed. Please try again later.";
         toast.error(message);
         settle(() => handlers.onError?.(new Error(message)));
       }
@@ -169,7 +167,26 @@ export function premiumAnalyzeResumeSSE(
 
   return es;
 }
- 
+
+export async function premiumAnalyzeResumeResult(
+  jobId: string,
+  options?: AuthOptions,
+): Promise<PremiumAnalyzeResult | null> {
+  try {
+    const { data } = await axios.get<PremiumAnalyzeResult>(
+      `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/resume/analyze/result/${jobId}`,
+      authConfig(options),
+    );
+    return data;
+  } catch (error: unknown) {
+    console.error(error);
+    const errorMessage = axiosErrorMessage(error, "Failed to get analyze result. Please try again later.");
+    toast.error(errorMessage);
+    console.error(errorMessage);
+    return null;
+  }
+}
+
 export type Resume = {
   resume_id: string;
   version: number;

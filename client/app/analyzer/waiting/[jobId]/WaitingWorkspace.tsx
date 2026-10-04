@@ -6,11 +6,9 @@ import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import {
   premiumAnalyzeResumeSSE,
-  type PremiumAnalyzeResult,
 } from "@/services/resumeService";
 import { AnalyzerLoading } from "../../AnalyzerLoading";
 
-const RESULT_STORAGE_PREFIX = "analyzer_result_";
 const FILE_STORAGE_PREFIX = "analyzer_file_";
 
 export function WaitingWorkspace() {
@@ -44,22 +42,14 @@ export function WaitingWorkspace() {
         }
       },
       onComplete: (event) => {
-        setProgress(100);
-        setStatusText("Analysis complete — opening results…");
-
-        const result = event.result as PremiumAnalyzeResult | undefined;
-        if (result) {
-          sessionStorage.setItem(
-            `${RESULT_STORAGE_PREFIX}${jobId}`,
-            JSON.stringify(result),
-          );
-          router.replace(`/analyzer/result/${jobId}`);
+        if (event.status !== "COMPLETED") {
+          setFailed(true);
+          toast.error("Analysis failed. Please try again.");
           return;
         }
-
-        // Worker published COMPLETED without embedding the payload.
-        toast.error("Analysis finished but results were missing. Try again.");
-        setFailed(true);
+        setProgress(100);
+        setStatusText("Analysis complete — opening results…");
+        router.push(`/analyzer/result/${jobId}`);
       },
       onError: () => {
         setFailed(true);
