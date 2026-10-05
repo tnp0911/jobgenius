@@ -205,7 +205,6 @@ export async function getResumes(options?: AuthOptions): Promise<Resume[] | null
   } catch (error: unknown) {
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to get resumes. Please try again later.");
-    toast.error(errorMessage);
     console.error(errorMessage);
     return null;
   }

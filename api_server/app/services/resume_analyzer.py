@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 ############################### EXTRACT SECTIONS ################################
-async def convert_file_to_bytes(file: UploadFile) -> bytes:
+async def convert_file_to_bytes(file: UploadFile | None) -> bytes:
     try:
         if not file:
             raise ValueError("File is required.")

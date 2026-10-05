@@ -101,7 +101,18 @@
 .history-version-label {
   margin: 0;
   font-weight: 600;
-  color: var(--ink);
+}
+
+.history-version-label a {
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--brand);
+}
+
+.history-version-label a:hover {
+  text-decoration: underline;
 }
 
 .history-latest-badge {
