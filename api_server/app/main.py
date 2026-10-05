@@ -59,7 +59,15 @@ async def lifespan(app: FastAPI):
         )
 
 
-app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+app = FastAPI(
+    title=settings.APP_NAME, 
+    debug=settings.DEBUG, 
+    lifespan=lifespan,
+    # docs_url = None,
+    # redoc_url=None,
+    # openapi_url=None,
+    version = "2.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,

@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class Settings(BaseSettings):
     # 🧠 App
-    APP_NAME: str = "api_server"
+    APP_NAME: str = "JobGenius | api_server"
     DEBUG: bool = True
     API_KEY: str
     CORS_ALLOW_ORIGINS: List[str] = [

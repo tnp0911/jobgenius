@@ -17,12 +17,14 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 type ResumeGroup = {
   resumeId: string;
   filename: string;
+  storage_path: string;
   versions: Resume[];
   latestVersion: number;
 };
 
 type SelectedVersion = {
   resumeId: string;
+  storage_path: string;
   version: number;
 };
 
@@ -44,6 +46,7 @@ function groupResumes(resumes: Resume[]): ResumeGroup[] {
       return {
         resumeId: sorted[0].resume_id,
         filename: sorted[0].filename,
+        storage_path: sorted[0].storage_path,
         versions: sorted,
         latestVersion: sorted[0].version,
       };
@@ -131,6 +134,7 @@ function HistoryAnalysis({
 }: {
   filename: string;
   version: number;
+  storage_path: string;
   analysis: Record<string, unknown>;
   onClose: () => void;
 }) {
@@ -281,7 +285,7 @@ export function HistoryWorkspace() {
 
     const options: AuthOptions = {
       signal: controller.signal,
-      timeout: 15_000,
+      timeout: 10_000,
     };
 
     setLoadState("loading");
@@ -298,17 +302,17 @@ export function HistoryWorkspace() {
   }, []);
 
   const loadAnalysis = useCallback(
-    async (resumeId: string, version: number) => {
+    async (resumeId: string, storage_path: string, version: number) => {
       analysisControllerRef.current?.abort();
       const controller = new AbortController();
       analysisControllerRef.current = controller;
 
       const options: AuthOptions = {
         signal: controller.signal,
-        timeout: 15_000,
+        timeout: 10_000,
       };
 
-      setSelected({ resumeId, version });
+      setSelected({ resumeId, storage_path, version });
       setAnalysis(null);
       setAnalysisState("loading");
 
@@ -505,7 +509,7 @@ export function HistoryWorkspace() {
                     >
                       <div className="history-version-copy">
                         <p className="history-version-label">
-                          Version {resume.version}
+                          <a href={resume.storage_path} target="_blank">Version {resume.version}</a>
                         </p>
                         {isLatest ? (
                           <span className="history-latest-badge">Latest</span>
@@ -517,7 +521,7 @@ export function HistoryWorkspace() {
                           className="mkt-btn mkt-btn-ghost"
                           disabled={viewing}
                           onClick={() => {
-                            void loadAnalysis(resume.resume_id, resume.version);
+                            void loadAnalysis(resume.resume_id, resume.storage_path, resume.version);
                           }}
                         >
                           {viewing ? "Opening…" : "View analysis"}
@@ -560,7 +564,7 @@ export function HistoryWorkspace() {
             type="button"
             className="mkt-btn mkt-btn-primary"
             onClick={() => {
-              void loadAnalysis(selected.resumeId, selected.version);
+              void loadAnalysis(selected.resumeId, selected.storage_path, selected.version);
             }}
           >
             Try again
@@ -570,6 +574,7 @@ export function HistoryWorkspace() {
 
       {selected && analysis ? (
         <HistoryAnalysis
+          storage_path={selected.storage_path}
           filename={
             groups.find((group) => group.resumeId === selected.resumeId)
               ?.filename ?? "Resume"

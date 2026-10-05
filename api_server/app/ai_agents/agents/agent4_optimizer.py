@@ -229,6 +229,8 @@ async def optimizer_agent(
         - changes_made: max 8 short bullets describing what you improved (structure, wording, emphasis)
         - suggested_additions_if_true: max 5 optional items the user could add IF true (metrics, missing JD skills they actually have)
         - optimization_notes: 2–4 sentences on strategy used (role, scores, JD fit if any)
+        
+        Return a valid JSON is a MUST.
         """
 
     response = await llm_call(prompt)

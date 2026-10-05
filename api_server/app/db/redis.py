@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 import redis.asyncio as redis
-
 from app.core.config import settings
 
 redis_client: redis.Redis | None = None
@@ -35,6 +34,7 @@ async def init_redis():
     if not is_alive:
         raise RuntimeError("Failed to connect to Redis")
     logger.info("Redis client initialized and connected successfully")
+    return redis_client, is_alive
 
 
 async def close_redis():
@@ -76,9 +76,10 @@ async def reset_redis_pool(reason: str = "") -> None:
             logger.exception("Redis pool reset ping failed")
 
 
-def get_redis_client() -> redis.Redis:
+def get_redis_client() -> redis.Redis | None:
     if redis_client is None:
-        raise RuntimeError("Redis client not initialized")
+        logger.error("Redis client not initialized")
+        return None
     return redis_client
 
 
@@ -106,6 +107,7 @@ async def cache_get(key: str) -> str | None:
         logger.exception("Redis GET failed for key %s", key)
         _schedule_pool_reset(f"GET error key={key}")
         return None
+
 
 async def cache_set(
     key: str,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const DISCLAIMERS = [
   "This resume analyzer is for general guidance — not a guarantee of interviews or offers.",
@@ -20,12 +20,35 @@ const STATUS_LINES = [
 
 type AnalyzerLoadingProps = {
   fileName?: string;
+  /**
+   * Server/SSE progress (0–100). Used as a floor; the ring still eases upward
+   * with a fake timer so mid-analysis doesn't look frozen between events.
+   */
+  progress?: number;
+  statusText?: string;
 };
 
-export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
+export function AnalyzerLoading({
+  fileName,
+  progress: progressProp,
+  statusText,
+}: AnalyzerLoadingProps) {
+  const controlled = typeof progressProp === "number";
+  const serverFloor = controlled
+    ? Math.min(100, Math.max(0, progressProp))
+    : 0;
+  const serverFloorRef = useRef(serverFloor);
+  serverFloorRef.current = serverFloor;
+
   const [disclaimerIndex, setDisclaimerIndex] = useState(0);
   const [statusIndex, setStatusIndex] = useState(0);
-  const [progress, setProgress] = useState(8);
+  const [progress, setProgress] = useState(controlled ? serverFloor : 8);
+
+  // Snap up when SSE reports a higher value; never drop below the server floor.
+  useEffect(() => {
+    if (!controlled) return;
+    setProgress((p) => Math.max(p, serverFloor));
+  }, [controlled, serverFloor]);
 
   useEffect(() => {
     const disclaimerTimer = window.setInterval(() => {
@@ -37,18 +60,37 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
     }, 3000);
 
     const progressTimer = window.setInterval(() => {
+      const floor = serverFloorRef.current;
       setProgress((p) => {
-        if (p >= 92) return 88 + Math.random() * 4;
-        return Math.min(92, p + 2 + Math.random() * 5);
+        // Done — lock to 100 once the server says so.
+        if (controlled && floor >= 100) return 100;
+
+        // Mid-analysis: ease slowly so the ring keeps moving.
+        if (p >= 30 && p <= 89) {
+          const next = p + 1.2 + Math.random() * 2.5;
+          // Controlled: don't race ahead of reality past ~94 until SSE catches up.
+          if (controlled) return Math.min(94, Math.max(next, floor));
+          return next;
+        }
+
+        if (p >= 92) {
+          if (controlled) return Math.max(floor, Math.min(96, p));
+          return 88 + Math.random() * 4;
+        }
+
+        const next = Math.min(92, p + 2 + Math.random() * 5);
+        return controlled ? Math.max(next, floor) : next;
       });
-    }, 1500);
+    }, 3000);
 
     return () => {
       window.clearInterval(disclaimerTimer);
       window.clearInterval(statusTimer);
       window.clearInterval(progressTimer);
     };
-  }, []);
+  }, [controlled]);
+
+  const shownProgress = Math.round(progress);
 
   return (
     <div className="analyzer-loading" aria-busy="true" aria-live="polite">
@@ -59,14 +101,16 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
           Analyzing <span>{fileName}</span>
         </p>
       ) : null}
-      <p className="analyzer-loading-status">{STATUS_LINES[statusIndex]}</p>
+      <p className="analyzer-loading-status">
+        {statusText ?? STATUS_LINES[statusIndex]}
+      </p>
 
       <div
         className="analyzer-loading-ring"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(progress)}
+        aria-valuenow={shownProgress}
         aria-label="Analysis progress"
       >
         <svg viewBox="0 0 120 120" className="analyzer-loading-ring-svg" aria-hidden="true">
@@ -78,11 +122,11 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
             r="52"
             style={{
               strokeDasharray: `${2 * Math.PI * 52}`,
-              strokeDashoffset: `${2 * Math.PI * 52 * (1 - progress / 100)}`,
+              strokeDashoffset: `${2 * Math.PI * 52 * (1 - shownProgress / 100)}`,
             }}
           />
         </svg>
-        <span className="analyzer-loading-ring-label">{Math.round(progress)}%</span>
+        <span className="analyzer-loading-ring-label">{shownProgress}%</span>
       </div>
 
       <div className="analyzer-loading-disclaimer">
@@ -100,7 +144,9 @@ export function AnalyzerLoading({ fileName }: AnalyzerLoadingProps) {
       </div>
 
       <p className="analyzer-loading-footnote">
-        Hang tight — this usually takes under a minute. Keep this tab open.
+        {controlled
+          ? "Premium analysis can take a bit longer. Keep this tab open while we stream progress."
+          : "Hang tight — this usually takes under a minute. Keep this tab open."}
       </p>
     </div>
   );

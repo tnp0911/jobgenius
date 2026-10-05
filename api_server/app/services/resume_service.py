@@ -1,16 +1,16 @@
 import asyncio
 import hashlib
 import logging
-
-from botocore.exceptions import ClientError
-from bson import ObjectId
-from fastapi import HTTPException, status
+from pathlib import Path
 
 from app.core.config import settings
 from app.db.mongo import get_mongo_client
 from app.db.s3 import get_s3_client
 from app.helpers.resume_helper import analyzer_result_to_text, format_analyzer_result
 from app.models.resume import Resume, ResumeAnalysis, ResumeForJobRecommendation
+from botocore.exceptions import ClientError
+from bson import ObjectId
+from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,10 @@ async def store_resume_to_mongodb(
             "resume_for_job_recommendation"
         ]
 
+        extracted_filename = Path(resume_filename).stem
         formatted_result = format_analyzer_result(analyzed_result)
         full_combined_text = analyzer_result_to_text(analyzed_result)
-        resume_id_generator = f"{user_id}_{resume_filename}"
+        resume_id_generator = f"{user_id}_{extracted_filename}"
 
         existing_resume = await resume_collection.find_one(
             {"resume_id": resume_id_generator},
@@ -87,7 +88,7 @@ async def store_resume_to_mongodb(
             return True
 
         next_version = (existing_resume["version"] + 1) if existing_resume else 1
-        storage_key = f"{user_id}/{resume_filename}/{next_version}.pdf"
+        storage_key = f"{user_id}/{extracted_filename}_{next_version}.pdf"
 
         await asyncio.to_thread(
             s3_client.put_object,
@@ -103,7 +104,7 @@ async def store_resume_to_mongodb(
             user_id=user_id,
             resume_id=resume_id_generator,
             version=next_version,
-            filename=resume_filename,
+            filename=extracted_filename,
             storage_path=storage_key,
             content_sha256=digest,
             analysis=formatted_result,
@@ -158,7 +159,7 @@ async def get_resumes_from_mongodb(user_id: int):
                     "resume_id": response["resume_id"],
                     "version": response["version"],
                     "filename": response["filename"],
-                    "storage_path": response["storage_path"],
+                    "storage_path": f"http://localhost:4566/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
                 }
             )
         return resumes
@@ -190,7 +191,7 @@ async def get_resume_by_id_and_version_from_mongodb(
             "resume_id": response["resume_id"],
             "version": response["version"],
             "filename": response["filename"],
-            "storage_path": response["storage_path"],
+            "storage_path": f"localhost:4566/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
             "analysis": analysis.model_dump(mode="json"),
         }
     except ValueError:
@@ -216,7 +217,7 @@ async def get_resume_by_id_from_mongodb(user_id: int, resume_id: str):
                     "resume_id": response["resume_id"],
                     "version": response["version"],
                     "filename": response["filename"],
-                    "storage_path": response["storage_path"],
+                    "storage_path": f"localhost:4566/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
                 }
             )
         if not resumes:
