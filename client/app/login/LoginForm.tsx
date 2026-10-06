@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { handleGoogleLogin } from "@/auth/oauth";
+import { handleGoogleLogin, handleFacebookLogin } from "@/auth/oauth";
 import { handleLogin } from "@/auth/api";
 import { LoginRequest } from "@/auth/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -120,8 +120,7 @@ export function LoginForm() {
             <button
               type="button"
               className="social-login-btn facebook-login-btn"
-              // onClick={handleFacebookLogin}
-              disabled
+              onClick={handleFacebookLogin}
             >
               <img
                 src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png"
