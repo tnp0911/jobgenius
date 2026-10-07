@@ -54,7 +54,13 @@
 
 JobGenius is a personal software engineering and learning project developed for educational, portfolio, and experimentation purposes. It demonstrates the design and implementation of a full-stack, AI-powered career platform using technologies such as microservices, LLMs, vector search, authentication, payments, and containerized infrastructure.
 
-The application is under active development and is not currently intended to be a production-ready commercial service. Features, pricing, integrations, and implementation details may change without notice.
+The application is under active development and is not intended to be a production-ready commercial service. Features, pricing, integrations, and implementation details may change without notice.
+
+We are not responsible for any loss, damage, inaccurate information, employment decisions, financial decisions, or other consequences arising from the use of this software or its generated content. AI-generated recommendations, job information, resume analysis, career suggestions, and other outputs may contain errors, omissions, or outdated information and should be independently verified before being relied upon.
+
+JobGenius does not guarantee employment, interview opportunities, job placement, resume performance, or the accuracy or availability of third-party job listings and services. Third-party APIs, services, payment providers, AI models, and other integrations are subject to their own availability, terms, limitations, and privacy policies.
+
+This project is provided for demonstration and learning purposes on an "as is" and "as available" basis, without warranties of any kind, to the extent permitted by applicable law.
 <hr>
 JobGenius is a privacy-first, AI-powered career platform that helps job seekers get honest, actionable resume feedback and discover roles that genuinely match their experience — all without sending personal data to third-party cloud AI providers.
 
