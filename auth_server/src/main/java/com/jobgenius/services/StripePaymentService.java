@@ -5,6 +5,7 @@ import com.jobgenius.dto.StripePaymentRequest;
 import com.jobgenius.models.Payment;
 import com.jobgenius.models.PaymentMetadata;
 import com.jobgenius.models.User;
+import com.jobgenius.repositories.JGPaymentProviderCustomerIdRepository;
 import com.jobgenius.repositories.PaymentMetadataRepository;
 import com.jobgenius.repositories.PaymentRepository;
 import com.jobgenius.repositories.UserRepository;
@@ -52,7 +53,10 @@ public class StripePaymentService extends PaymentService {
     private final PaymentMetadataRepository paymentMetadataRepository;
     private final UserRepository userRepository;
     private final FastAPIUpdates fastAPIUpdates;
+    private final JGPaymentProviderCustomerIdRepository jgPaymentProviderCustomerIdRepository;
+    private final UserService userService;
 
+    @Transactional
     @Override
     public String createPayment(Object request, Authentication authentication) throws Exception {
         StripePaymentRequest req = (StripePaymentRequest) request;
@@ -60,7 +64,11 @@ public class StripePaymentService extends PaymentService {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new Exception("User not found"));
 
-        String userId = user.getUid().toString();
+        Long userIdLong = user.getUid();
+        String userId = userIdLong.toString();
+        String customerRef = jgPaymentProviderCustomerIdRepository
+                .findProviderCustomerRefByUserIdAndProvider(userIdLong, "STRIPE")
+                .orElseGet(() -> userService.createStripeCustomer(user, userId));
         boolean alreadyUsedFreeTrial = paymentMetadataRepository.existsFreeTrialByUserId(user.getUid()) > 0;
 
         // userId must live on subscription_data.metadata — invoice.metadata is NOT copied from the session.
@@ -76,7 +84,6 @@ public class StripePaymentService extends PaymentService {
                 .setUiMode(SessionCreateParams.UiMode.HOSTED_PAGE)
                 .setSuccessUrl(req.getSuccessUrl())
                 .setCancelUrl(req.getCancelUrl())
-                .setCustomerEmail(user.getEmail())
                 .setBillingAddressCollection(SessionCreateParams.BillingAddressCollection.AUTO)
                 .setPaymentMethodCollection(SessionCreateParams.PaymentMethodCollection.ALWAYS)
                 .setAllowPromotionCodes(true)
@@ -91,6 +98,7 @@ public class StripePaymentService extends PaymentService {
                 .setSubmitType(SessionCreateParams.SubmitType.AUTO)
                 .setIntegrationIdentifier("hosted_web_0001")
                 .setSubscriptionData(subscriptionData.build())
+                .setCustomer(customerRef)
                 .putMetadata(USER_ID_META_KEY, userId)
                 .addLineItem(
                         SessionCreateParams.LineItem.builder()
@@ -136,9 +144,6 @@ public class StripePaymentService extends PaymentService {
             throw new RuntimeException(e);
         }
         switch (event.getType()) {
-            /**
-             * Seed user ↔ subscription mapping before invoice.paid (invoice.metadata is usually empty).
-             */
             case "checkout.session.completed": {
                 EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
                 Session session;
@@ -282,7 +287,6 @@ public class StripePaymentService extends PaymentService {
         Payment payment = paymentRepository.findByProviderPaymentRef(paymentRef).orElseGet(Payment::new);
         if (payment.getPaymentId() == null) {
             payment.setUser(user);
-            payment.setProvider("STRIPE");
             payment.setProviderPaymentRef(paymentRef);
             payment.setStatus(PaymentStatus.PENDING);
             payment.setCreatedAt(now);
@@ -320,7 +324,6 @@ public class StripePaymentService extends PaymentService {
         boolean isNew = payment.getPaymentId() == null;
         if (isNew) {
             payment.setUser(user);
-            payment.setProvider("STRIPE");
             payment.setProviderPaymentRef(paymentRef);
             payment.setCreatedAt(now);
         }
@@ -356,7 +359,6 @@ public class StripePaymentService extends PaymentService {
         boolean isNew = payment.getPaymentId() == null;
         if (isNew) {
             payment.setUser(user);
-            payment.setProvider("STRIPE");
             payment.setProviderPaymentRef(paymentRef);
             payment.setCreatedAt(now);
         }
@@ -507,4 +509,6 @@ public class StripePaymentService extends PaymentService {
                 : OffsetDateTime.now(ZoneOffset.UTC).plusDays(30);
         return end.format(ISO_OFFSET);
     }
+
+
 }
