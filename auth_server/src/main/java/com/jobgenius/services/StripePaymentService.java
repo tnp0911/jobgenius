@@ -68,7 +68,7 @@ public class StripePaymentService extends PaymentService {
         String userId = userIdLong.toString();
         String customerRef = jgPaymentProviderCustomerIdRepository
                 .findProviderCustomerRefByUserIdAndProvider(userIdLong, "STRIPE")
-                .orElseGet(() -> userService.createStripeCustomer(user, userId));
+                .orElseGet(() -> userService.createStripeCustomer(user, userId, ""));
         boolean alreadyUsedFreeTrial = paymentMetadataRepository.existsFreeTrialByUserId(user.getUid()) > 0;
 
         // userId must live on subscription_data.metadata — invoice.metadata is NOT copied from the session.
@@ -315,8 +315,18 @@ public class StripePaymentService extends PaymentService {
             logger.warn("invoice.paid {} has no subscription; skipping", invoice.getId());
             return;
         }
-
+        String stripeCustomerId = invoice.getCustomer();
         User user = resolveUserForInvoice(invoice, subscriptionId);
+        jgPaymentProviderCustomerIdRepository.findProviderCustomerRefByUserIdAndProvider(user.getUid(), "STRIPE")
+                .orElseGet(() -> {
+                    if (stripeCustomerId != null && !stripeCustomerId.isBlank()) {
+                        userService.createStripeCustomer(user, user.getUid().toString(), stripeCustomerId);
+                        logger.info("invoice.paid {}: mapped user {} → Stripe customer {}", invoice.getId(), user.getUid(), stripeCustomerId);
+                    } else {
+                        logger.warn("invoice.paid {}: no Stripe customer id for user {}", invoice.getId(), user.getUid());
+                    }
+                    return stripeCustomerId;
+                });
         String paymentRef = paymentRefForInvoice(invoice);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -351,7 +361,18 @@ public class StripePaymentService extends PaymentService {
             return;
         }
 
+        String stripeCustomerId = invoice.getCustomer();
         User user = resolveUserForInvoice(invoice, subscriptionId);
+        jgPaymentProviderCustomerIdRepository.findProviderCustomerRefByUserIdAndProvider(user.getUid(), "STRIPE")
+                .orElseGet(() -> {
+                    if (stripeCustomerId != null && !stripeCustomerId.isBlank()) {
+                        userService.createStripeCustomer(user, user.getUid().toString(), stripeCustomerId);
+                        logger.info("invoice.paid {}: mapped user {} → Stripe customer {}", invoice.getId(), user.getUid(), stripeCustomerId);
+                    } else {
+                        logger.warn("invoice.paid {}: no Stripe customer id for user {}", invoice.getId(), user.getUid());
+                    }
+                    return stripeCustomerId;
+                });
         String paymentRef = paymentRefForInvoice(invoice);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 

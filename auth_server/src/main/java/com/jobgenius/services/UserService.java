@@ -102,20 +102,27 @@ public class UserService {
         }
     }
 
-    protected String createStripeCustomer(User user, String userId) {
+    protected String createStripeCustomer(User user, String userId, String stripeCustomerId) {
         try {
-            Customer customer = Customer.create(
-                    CustomerCreateParams.builder()
-                            .setEmail(user.getEmail())
-                            .setName(user.getName())
-                            .putMetadata("userId", userId)
-                            .build()
-            );
+            String customerId = "";
+            if (stripeCustomerId.isEmpty()) {
+                Customer customer = Customer.create(
+                        CustomerCreateParams.builder()
+                                .setEmail(user.getEmail())
+                                .setName(user.getName())
+                                .putMetadata("userId", userId)
+                                .build()
+                );
+                customerId = customer.getId();
+            }
+            else {
+                customerId = stripeCustomerId;
+            }
 
             PaymentProviderCusIdCompositeKey key =
                     new PaymentProviderCusIdCompositeKey(
                             user.getUid(),
-                            customer.getId()
+                            customerId
                     );
 
             JGPaymentProviderCustomerId mapping =
@@ -127,7 +134,7 @@ public class UserService {
 
             jgPaymentProviderCustomerIdRepository.save(mapping);
 
-            return customer.getId();
+            return customerId;
 
         } catch (StripeException e) {
             throw new RuntimeException("Failed to create Stripe customer", e);
