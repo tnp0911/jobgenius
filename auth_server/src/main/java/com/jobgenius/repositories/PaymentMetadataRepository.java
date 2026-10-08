@@ -5,12 +5,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PaymentMetadataRepository extends JpaRepository<PaymentMetadata, Long> {
     Optional<PaymentMetadata> findByPayment_PaymentId(Long paymentId);
 
     PaymentMetadata findByKeyAndValue(String key, String value);
+
+    Optional<List<String>> findAllProviderPaymentRefByUser_Uid(Long uid);
 
     @Query(value = """
     SELECT pm.payment_metadata_value FROM payment_metadata pm

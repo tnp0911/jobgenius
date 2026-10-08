@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 @Component
@@ -63,12 +64,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             if (jwtservice.validateToken(token) && !redisService.isBlacklisted(token)) {
-                String username = jwtservice.extractUsername(token);
+                String username = jwtservice.extractUsername(token); // username is the email in this case
                 String role = jwtservice.extractUserRole(token);
+                Long userId = jwtservice.extractUserId(token);
                 List<GrantedAuthority> authorities = List.of(
                         new SimpleGrantedAuthority("ROLE_" + role));
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                         username, null, authorities);
+                Map<String, Long> details = Map.of("user_id", userId);
+                authenticationToken.setDetails(details);
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             }
         } 
