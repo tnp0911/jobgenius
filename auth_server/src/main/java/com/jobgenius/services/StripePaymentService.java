@@ -13,12 +13,11 @@ import com.jobgenius.utils.FastAPIUpdates;
 import com.jobgenius.utils.PaymentStatus;
 import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.exception.SignatureVerificationException;
-import com.stripe.model.Event;
-import com.stripe.model.EventDataObjectDeserializer;
-import com.stripe.model.Invoice;
-import com.stripe.model.Subscription;
+import com.stripe.exception.StripeException;
+import com.stripe.model.*;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
+import com.stripe.param.CustomerUpdateParams;
 import com.stripe.param.SubscriptionUpdateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.transaction.Transactional;
@@ -29,9 +28,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -131,8 +133,82 @@ public class StripePaymentService extends PaymentService {
         }
     }
 
-    @Transactional
     @Override
+    public List<String> getAllInvoicesByUserId(Authentication authentication) throws Exception {
+        try {
+            Map<String, Long> details = (Map<String, Long>) authentication.getDetails();
+            Long userId = details.get("user_id");
+            return paymentMetadataRepository.findAllProviderPaymentRefByUser_Uid(userId)
+                    .orElse(List.of());
+        }
+        catch (Exception e) {
+            throw new Exception("Failed to retrieve invoices: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public String getInvoiceById(String invoiceId) throws Exception {
+        try {
+            Invoice invoice = Invoice.retrieve(invoiceId);
+            return invoice.toJson();
+        } catch (Exception e) {
+            throw new Exception("Failed to retrieve invoice: " + e.getMessage());
+        }
+    }
+
+    // TODO: Need to be adjusted the successUrl and cancelUrl
+    @Override
+    public String changePaymentMethod(String subscriptionId) throws Exception {
+        try {
+            Subscription subscription = Subscription.retrieve(subscriptionId);
+            String stripeCustomerId = subscription.getCustomer();
+            SessionCreateParams params = SessionCreateParams.builder()
+                    .setMode(SessionCreateParams.Mode.SETUP)
+                    .setCustomer(stripeCustomerId)
+                    .setSetupIntentData(
+                            SessionCreateParams.SetupIntentData.builder()
+                                    .putMetadata("subscription_id", subscriptionId)
+                                    .build()
+                    )
+                    .setSuccessUrl("https://your-success-url.com?message=Payment method updated successfully")
+                    .setCancelUrl("https://your-cancel-url.com?message=Payment method update canceled")
+                    .build();
+            Session session = Session.create(params);
+            return session.getUrl();
+        }
+        catch (Exception e) {
+            throw new Exception("Failed to change payment method: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public LocalDate getNextBillingDate(String subscriptionId) throws Exception {
+        try {
+            Subscription subscription = Subscription.retrieve(subscriptionId);
+            String status = subscription.getStatus();
+            Long nextBillingTimestamp;
+            if ("active".equals(status)) {
+                nextBillingTimestamp = subscription.getItems().getData().get(0).getCurrentPeriodEnd();
+            } else if ("trialing".equals(status)) {
+                nextBillingTimestamp = subscription.getTrialEnd();
+            } else {
+                nextBillingTimestamp = 0L;
+            }
+            if (nextBillingTimestamp != null) {
+                return Instant.ofEpochSecond(nextBillingTimestamp)
+                        .atZone(ZoneOffset.UTC)
+                        .toLocalDate();
+            }
+            else {
+                throw new Exception("Next billing date is not available for subscription: " + subscriptionId);
+            }
+        }
+        catch (Exception e) {
+            throw new Exception("Failed to retrieve next billing date: " + e.getMessage());
+        }
+    }
+
+    @Transactional
     public void handleWebhook(String payload, String sigHeader)
             throws JsonProcessingException, EventDataObjectDeserializationException {
 
@@ -243,6 +319,17 @@ public class StripePaymentService extends PaymentService {
         if (subscriptionId == null || subscriptionId.isBlank()) {
             logger.warn("checkout.session.completed {}: no subscription id", session.getId());
             return;
+        }
+
+        String setupIntentId = session.getSetupIntent();
+        if(setupIntentId != null && !setupIntentId.isBlank()) {
+            try {
+                SetupIntent setupIntent = retrieveSetupIntent(setupIntentId);
+                updateDefaultPaymentMethod(setupIntent);
+                return;
+            } catch (Exception e) {
+                logger.error("checkout.session.completed {}: failed to update default payment method for setup intent {}: {}", session.getId(), setupIntentId, e.getMessage());
+            }
         }
 
         // Prefer session metadata; fall back to subscription metadata (authoritative for invoices).
@@ -531,5 +618,41 @@ public class StripePaymentService extends PaymentService {
         return end.format(ISO_OFFSET);
     }
 
+    private static SetupIntent retrieveSetupIntent(String setupIntentId) {
+        try {
+            return SetupIntent.retrieve(setupIntentId);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve SetupIntent: " + e.getMessage());
+        }
+    }
 
+    private static void updateDefaultPaymentMethod(SetupIntent setupIntent) {
+        if (setupIntent == null) {
+            throw new IllegalArgumentException("SetupIntent cannot be null");
+        }
+        try {
+            Customer customer = Customer.retrieve(setupIntent.getCustomer());
+            String paymentMethodId = setupIntent.getPaymentMethod();
+
+            // Update default payment method for the customer
+            CustomerUpdateParams params = CustomerUpdateParams.builder()
+                    .setInvoiceSettings(
+                            CustomerUpdateParams.InvoiceSettings.builder()
+                                    .setDefaultPaymentMethod(paymentMethodId)
+                                    .build())
+                    .build();
+            customer.update(params);
+
+            // Update the default payment method for the subscription
+            Subscription subscription = Subscription.retrieve(setupIntent.getMetadata().get("subscription_id"));
+            SubscriptionUpdateParams subscriptionParams = SubscriptionUpdateParams.builder()
+                    .setDefaultPaymentMethod(paymentMethodId)
+                    .build();
+            subscription.update(subscriptionParams);
+        } catch (StripeException e) {
+            throw new RuntimeException("Failed to retrieve Customer: " + e.getMessage());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update default payment method: " + e.getMessage());
+        }
+    }
 }

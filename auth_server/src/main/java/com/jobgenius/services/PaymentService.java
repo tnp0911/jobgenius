@@ -1,8 +1,10 @@
 package com.jobgenius.services;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 
-import lombok.RequiredArgsConstructor;
+import java.time.LocalDate;
+import java.util.List;
 
 @RequiredArgsConstructor
 public abstract class PaymentService {
@@ -10,5 +12,11 @@ public abstract class PaymentService {
 
     public abstract String cancelSubscription(String subscriptionId) throws Exception;
 
-    public abstract void handleWebhook(String payload, String sigHeader) throws Exception;
+    public abstract List<String> getAllInvoicesByUserId(Authentication authentication) throws Exception;
+
+    public abstract String getInvoiceById(String invoiceId) throws Exception;
+
+    public abstract String changePaymentMethod(String subscriptionId) throws Exception;
+
+    public abstract LocalDate getNextBillingDate(String subscriptionId) throws Exception;
 }
