@@ -138,8 +138,7 @@ public class StripePaymentService extends PaymentService {
         try {
             Map<String, Long> details = (Map<String, Long>) authentication.getDetails();
             Long userId = details.get("user_id");
-            return paymentRepository.findAllProviderPaymentRefByUser_Uid(userId)
-                    .orElse(List.of());
+            return paymentRepository.findAllProviderPaymentRefByUserUid(userId);
         }
         catch (Exception e) {
             throw new Exception("Failed to retrieve invoices: " + e.getMessage());
