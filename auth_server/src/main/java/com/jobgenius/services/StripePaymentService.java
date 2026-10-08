@@ -163,7 +163,9 @@ public class StripePaymentService extends PaymentService {
             String stripeCustomerId = subscription.getCustomer();
             SessionCreateParams params = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.SETUP)
+                    .setCurrency("cad")
                     .setCustomer(stripeCustomerId)
+                    .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
                     .setSetupIntentData(
                             SessionCreateParams.SetupIntentData.builder()
                                     .putMetadata("subscription_id", subscriptionId)
@@ -314,12 +316,6 @@ public class StripePaymentService extends PaymentService {
     }
 
     private void handleCheckoutSessionCompleted(Session session) {
-        String subscriptionId = session.getSubscription();
-        if (subscriptionId == null || subscriptionId.isBlank()) {
-            logger.warn("checkout.session.completed {}: no subscription id", session.getId());
-            return;
-        }
-
         String setupIntentId = session.getSetupIntent();
         if(setupIntentId != null && !setupIntentId.isBlank()) {
             try {
@@ -329,6 +325,12 @@ public class StripePaymentService extends PaymentService {
             } catch (Exception e) {
                 logger.error("checkout.session.completed {}: failed to update default payment method for setup intent {}: {}", session.getId(), setupIntentId, e.getMessage());
             }
+        }
+        
+        String subscriptionId = session.getSubscription();
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            logger.warn("checkout.session.completed {}: no subscription id", session.getId());
+            return;
         }
 
         // Prefer session metadata; fall back to subscription metadata (authoritative for invoices).
@@ -625,7 +627,7 @@ public class StripePaymentService extends PaymentService {
         }
     }
 
-    private static void updateDefaultPaymentMethod(SetupIntent setupIntent) {
+    private void updateDefaultPaymentMethod(SetupIntent setupIntent) {
         if (setupIntent == null) {
             throw new IllegalArgumentException("SetupIntent cannot be null");
         }
@@ -643,6 +645,7 @@ public class StripePaymentService extends PaymentService {
             customer.update(params);
 
             // Update the default payment method for the subscription
+            logger.info("Updating default payment method for subscription: {}", setupIntent.getMetadata().get("subscription_id"));
             Subscription subscription = Subscription.retrieve(setupIntent.getMetadata().get("subscription_id"));
             SubscriptionUpdateParams subscriptionParams = SubscriptionUpdateParams.builder()
                     .setDefaultPaymentMethod(paymentMethodId)
