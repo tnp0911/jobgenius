@@ -138,7 +138,7 @@ public class StripePaymentService extends PaymentService {
         try {
             Map<String, Long> details = (Map<String, Long>) authentication.getDetails();
             Long userId = details.get("user_id");
-            return paymentMetadataRepository.findAllProviderPaymentRefByUser_Uid(userId)
+            return paymentRepository.findAllProviderPaymentRefByUser_Uid(userId)
                     .orElse(List.of());
         }
         catch (Exception e) {
