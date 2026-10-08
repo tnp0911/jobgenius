@@ -1,8 +1,15 @@
 package com.jobgenius.services;
 
 import com.jobgenius.dto.FastAPICreateRequest;
+import com.jobgenius.models.JGPaymentProviderCustomerId;
+import com.jobgenius.models.PaymentProviderCusIdCompositeKey;
 import com.jobgenius.models.User;
+import com.jobgenius.repositories.JGPaymentProviderCustomerIdRepository;
 import com.jobgenius.repositories.UserRepository;
+import com.jobgenius.utils.FastAPIUpdates;
+import com.stripe.exception.StripeException;
+import com.stripe.model.Customer;
+import com.stripe.param.CustomerCreateParams;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -12,7 +19,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import com.jobgenius.utils.FastAPIUpdates;
 
 import java.util.List;
 
@@ -23,6 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final FastAPIUpdates fastAPIUpdates;
     private final PasswordEncoder passwordEncoder;
+    private final JGPaymentProviderCustomerIdRepository jgPaymentProviderCustomerIdRepository;
     private final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     public List<User> getAllUsers() {
@@ -92,6 +99,45 @@ public class UserService {
 
         for (Long uid: uids) {
             fastAPIUpdates.updatePlanFastAPI(uid.toString(), "FREE", "");
+        }
+    }
+
+    protected String createStripeCustomer(User user, String userId, String stripeCustomerId) {
+        try {
+            String customerId = "";
+            if (stripeCustomerId.isEmpty()) {
+                Customer customer = Customer.create(
+                        CustomerCreateParams.builder()
+                                .setEmail(user.getEmail())
+                                .setName(user.getName())
+                                .putMetadata("userId", userId)
+                                .build()
+                );
+                customerId = customer.getId();
+            }
+            else {
+                customerId = stripeCustomerId;
+            }
+
+            PaymentProviderCusIdCompositeKey key =
+                    new PaymentProviderCusIdCompositeKey(
+                            user.getUid(),
+                            customerId
+                    );
+
+            JGPaymentProviderCustomerId mapping =
+                    new JGPaymentProviderCustomerId();
+
+            mapping.setId(key);
+            mapping.setUser(user);
+            mapping.setProvider("STRIPE");
+
+            jgPaymentProviderCustomerIdRepository.save(mapping);
+
+            return customerId;
+
+        } catch (StripeException e) {
+            throw new RuntimeException("Failed to create Stripe customer", e);
         }
     }
 }
