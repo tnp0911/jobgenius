@@ -1,34 +1,22 @@
-# use the python 3.11.5 slim image
-FROM python:3.11.5-slim-bookworm
-LABEL org.opencontainers.image.authors="Tuong Nguyen Pham <tuongnguyen2004danang@gmail.com>"
-# set the working directory for the application
+# ---- build ----
+FROM python:3.11.5-slim-bookworm AS builder
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
-
-# Avoid writing .pyc, keep logs unbuffered
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Optional: system deps if pip wheels fail
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
-
-# copy the requirements.txt file to the container
-COPY requirements_docker.txt .
-RUN pip install --no-cache-dir -r requirements_docker.txt
-
-# copy the rest of the application code to the container
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+    
+# ---- runtime ----
+FROM python:3.11.5-slim-bookworm
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH"
+COPY --from=builder /app/.venv /app/.venv
 COPY app ./app
-
-# Enhance security by running the application as a non-root user
-RUN useradd --create-home nonrootuser \
-    && chown -R nonrootuser:nonrootuser /app
-
+RUN useradd --create-home nonrootuser && chown -R nonrootuser:nonrootuser /app
 USER nonrootuser
-
-# specify the port the app will run on
 EXPOSE 8000
-
-# run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

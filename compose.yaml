@@ -7,7 +7,7 @@ services:
       context: ./api_server
       dockerfile: Dockerfile
     container_name: api-server
-    image: currybon30/jobgenius-fastapi:2.0.0
+    image: currybon30/jobgenius-fastapi:2.1.0
     ports:
       - "8000:8000"
     env_file:
@@ -33,7 +33,7 @@ services:
   # Service 2: Arq Worker for background tasks
   worker:
     container_name: fastapi-worker
-    image: currybon30/jobgenius-fastapi:2.0.0
+    image: currybon30/jobgenius-fastapi:2.1.0
     command: ["arq", "app.bg_worker.WorkerSettings"]
     env_file:
       - ./api_server/.env
