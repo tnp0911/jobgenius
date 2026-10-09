@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
@@ -80,8 +79,6 @@ public class GeneralPaymentController {
         String subscriptionId = paymentMetadataRepository.findLatestSubscriptionIdByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Subscription not found"));
 
-        LocalDate nextBillingDate = stripePaymentService.getNextBillingDate(subscriptionId);
-        return ResponseEntity.ok(Map.of(
-                "nextBillingDate", nextBillingDate));
+        return ResponseEntity.ok(stripePaymentService.getNextBillingDate(subscriptionId));
     }
 }
