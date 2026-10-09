@@ -3,8 +3,8 @@ package com.jobgenius.services;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 public abstract class PaymentService {
@@ -18,5 +18,5 @@ public abstract class PaymentService {
 
     public abstract String changePaymentMethod(String subscriptionId) throws Exception;
 
-    public abstract LocalDate getNextBillingDate(String subscriptionId) throws Exception;
+    public abstract Map<String, Object> getNextBillingDate(String subscriptionId) throws Exception;
 }
