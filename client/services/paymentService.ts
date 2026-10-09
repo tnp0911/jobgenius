@@ -1,8 +1,8 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { authConfig } from "../auth/api";
 import { toast } from "react-toastify";
 import { AuthOptions } from "@/auth/types";
-import { axiosErrorMessage } from "@/utils/errorHelpers";
+import { axiosErrorMessage, isAborted } from "@/utils/errorHelpers";
 
 export async function createCheckoutSession(
   successUrl: string,
@@ -17,6 +17,7 @@ export async function createCheckoutSession(
     );
     return data.checkoutUrl;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(error, "Failed to create checkout session. Please try again later.");
     toast.error(errorMessage);
     console.error(errorMessage);
@@ -36,6 +37,7 @@ export async function cancelSubscription(
     );
     return data.message;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(error, "Failed to cancel subscription. Please try again later.");
     toast.error(errorMessage);
     console.error(errorMessage);
@@ -64,6 +66,7 @@ export async function getNextBillingDate(
       cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
     };
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(
       error,
       "Failed to load next billing date. Please try again later.",
@@ -84,6 +87,7 @@ export async function getInvoices(
     );
     return Array.isArray(data.invoices) ? data.invoices : [];
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(
       error,
       "Failed to load invoices. Please try again later.",
@@ -118,6 +122,7 @@ export async function getInvoiceHostedUrl(
       ? hostedUrl
       : null;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(
       error,
       "Failed to open invoice. Please try again later.",
@@ -139,6 +144,7 @@ export async function changePaymentMethod(
     );
     return data.stripeUrl ?? null;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(
       error,
       "Failed to start payment method update. Please try again later.",

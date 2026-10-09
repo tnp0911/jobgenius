@@ -9,6 +9,7 @@ import { handleGoogleLogin, handleFacebookLogin } from "@/auth/oauth";
 import { handleLogin } from "@/auth/api";
 import { LoginRequest } from "@/auth/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { isAborted } from "@/utils/errorHelpers";
 
 import "./login.css";
 
@@ -50,7 +51,7 @@ export function LoginForm() {
 
       router.push("/");
     } catch (error: unknown) {
-      if (controller.signal.aborted) return;
+      if (isAborted(error) || controller.signal.aborted) return;
 
       if (axios.isAxiosError(error)) {
         toast.error("Invalid email or password. Please try again.");

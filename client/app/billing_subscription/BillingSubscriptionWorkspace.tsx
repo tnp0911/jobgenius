@@ -12,6 +12,7 @@ import {
   getInvoices,
   getNextBillingDate,
 } from "@/services/paymentService";
+import { isAborted } from "@/utils/errorHelpers";
 import {
   getAnalyzerUsage,
   getJobFinderUsage,
@@ -354,6 +355,7 @@ export function BillingSubscriptionWorkspace() {
       }
       window.location.href = url;
     } catch (error) {
+      if (isAborted(error)) return;
       if (controller.signal.aborted || paymentMethodControllerRef.current !== controller) {
         return;
       }
@@ -394,6 +396,7 @@ export function BillingSubscriptionWorkspace() {
       setCancelBusy(false);
       void loadPremiumBilling();
     } catch (error) {
+      if (isAborted(error)) return;
       if (controller.signal.aborted || cancelControllerRef.current !== controller) {
         return;
       }
@@ -432,6 +435,7 @@ export function BillingSubscriptionWorkspace() {
       window.open(url, "_blank", "noopener,noreferrer");
       setOpeningInvoiceId(null);
     } catch (error) {
+      if (isAborted(error)) return;
       if (controller.signal.aborted || invoiceOpenControllerRef.current !== controller) {
         return;
       }
@@ -566,7 +570,7 @@ export function BillingSubscriptionWorkspace() {
                   setCancelModalOpen(true);
                 }}
               >
-                {cancelAtPeriodEnd ? "Cancellation scheduled" : "Cancel subscription"}
+                {cancelAtPeriodEnd ? "Cancelled" : "Cancel subscription"}
               </button>
             </>
           ) : (

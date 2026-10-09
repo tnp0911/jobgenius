@@ -20,6 +20,7 @@ import {
 } from "@/services/jobService";
 import { extractJobsPayload, type JobCardData } from "./jobNormalize";
 import { AuthOptions } from "@/auth/types";
+import { isAborted } from "@/utils/errorHelpers";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -325,6 +326,7 @@ export function JobRecommenderWorkspace() {
         }
       } catch (err) {
         if (cancelled) return;
+        if (isAborted(err)) return;
         const message = getErrorMessage(err, "Could not load recommendations.");
         setError(message);
         setJobs([]);
@@ -352,6 +354,7 @@ export function JobRecommenderWorkspace() {
         setError("No jobs found for that role and level.");
       }
     } catch (err) {
+      if (isAborted(err)) return;
       const message = getErrorMessage(err, "Could not refresh recommendations.");
       setError(message);
       toast.error(message);
@@ -372,6 +375,7 @@ export function JobRecommenderWorkspace() {
         setError("No premium matches yet. Upload a resume via prompt search or run the analyzer first.");
       }
     } catch (err) {
+      if (isAborted(err)) return;
       const message = getErrorMessage(err, "Could not refresh recommendations.");
       setError(message);
       toast.error(message);
@@ -412,6 +416,7 @@ export function JobRecommenderWorkspace() {
         toast.info(payload.message || "Search finished with no listings.");
       }
     } catch (err) {
+      if (isAborted(err)) return;
       if (controller.signal.aborted || controllerRef.current !== controller) return;
       const message = getErrorMessage(err, "Job search failed. Please try again.");
       toast.error(message);

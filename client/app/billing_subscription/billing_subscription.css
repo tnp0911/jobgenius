@@ -140,7 +140,7 @@
 }
 
 .billing-plan-badge.is-premium {
-  background: var(--brand);
+  background: rgba(0, 103, 0, 0.795);
   color: #fff;
 }
 
