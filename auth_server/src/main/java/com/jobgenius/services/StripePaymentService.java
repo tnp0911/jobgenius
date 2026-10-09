@@ -33,6 +33,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -122,10 +123,11 @@ public class StripePaymentService extends PaymentService {
     @Override
     public String cancelSubscription(String subscriptionId) throws Exception {
         try {
-            Subscription subscription = Subscription.retrieve(subscriptionId);
             SubscriptionUpdateParams params = SubscriptionUpdateParams.builder()
+                    .setCancelAt(SubscriptionUpdateParams.CancelAt.MAX_PERIOD_END)
                     .setCancelAtPeriodEnd(true)
                     .build();
+            Subscription subscription = Subscription.retrieve(subscriptionId);
             subscription.update(params);
             return "Subscription has been canceled and will remain active until the end of the current billing period.";
         } catch (Exception e) {
@@ -183,22 +185,38 @@ public class StripePaymentService extends PaymentService {
     }
 
     @Override
-    public LocalDate getNextBillingDate(String subscriptionId) throws Exception {
+    public Map<String, Object> getNextBillingDate(String subscriptionId) throws Exception {
         try {
             Subscription subscription = Subscription.retrieve(subscriptionId);
             String status = subscription.getStatus();
+
+            // Scheduled cancellation keeps status "active"/"trialing" until period end.
+            boolean cancelAtPeriodEnd = Boolean.TRUE.equals(subscription.getCancelAtPeriodEnd())
+                    || subscription.getCancelAt() != null
+                    || (subscription.getCanceledAt() != null
+                            && ("active".equals(status) || "trialing".equals(status)));
+
             Long nextBillingTimestamp;
-            if ("active".equals(status)) {
-                nextBillingTimestamp = subscription.getItems().getData().get(0).getCurrentPeriodEnd();
+            if (subscription.getCancelAt() != null) {
+                nextBillingTimestamp = subscription.getCancelAt();
             } else if ("trialing".equals(status)) {
                 nextBillingTimestamp = subscription.getTrialEnd();
+            } else if ("active".equals(status)
+                    && subscription.getItems() != null
+                    && !subscription.getItems().getData().isEmpty()) {
+                nextBillingTimestamp = subscription.getItems().getData().get(0).getCurrentPeriodEnd();
             } else {
                 nextBillingTimestamp = 0L;
             }
+
             if (nextBillingTimestamp != null) {
-                return Instant.ofEpochSecond(nextBillingTimestamp)
+                LocalDate nextBillingDate = Instant.ofEpochSecond(nextBillingTimestamp)
                         .atZone(ZoneOffset.UTC)
                         .toLocalDate();
+                Map<String, Object> body = new HashMap<>();
+                body.put("nextBillingDate", nextBillingDate);
+                body.put("cancelAtPeriodEnd", cancelAtPeriodEnd);
+                return body;
             }
             else {
                 throw new Exception("Next billing date is not available for subscription: " + subscriptionId);
