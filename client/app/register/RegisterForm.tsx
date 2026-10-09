@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import "./register.css";
 import { handleRegister } from "@/auth/api";
 import { RegisterRequest } from "@/auth/types";
+import { isAborted } from "@/utils/errorHelpers";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -51,15 +52,12 @@ export function RegisterForm() {
       router.replace("/login");
       toast.success("Registration successful");
     } catch (error: unknown) {
+      if (isAborted(error)) return;
       if (axios.isAxiosError(error)) {
-        if (error.name === "CanceledError") {
-          toast.error("Registration failed: Request was aborted by user");
-        } else {
-          toast.error(
-            "Registration failed: " +
-              (error.response?.data?.message || error.message),
-          );
-        }
+        toast.error(
+          "Registration failed: " +
+            (error.response?.data?.message || error.message),
+        );
       } else if (error instanceof Error) {
         toast.error("Registration failed: " + error.message);
       } else {

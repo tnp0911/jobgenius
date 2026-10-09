@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "@/contexts/AuthContext";
 import { createCheckoutSession } from "@/services/paymentService";
 import { AuthOptions } from "@/auth/types";
+import { isAborted } from "@/utils/errorHelpers";
 
 type PlansUpgradeButtonProps = {
   className?: string;
@@ -64,6 +65,7 @@ export function PlansUpgradeButton({
       }
       window.location.href = url;
     } catch (error) {
+      if (isAborted(error)) return;
       if (controller.signal.aborted || controllerRef.current !== controller) return;
       const message =
         error instanceof Error ? error.message : "Could not start checkout.";

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { AuthOptions, ForgotPasswordRequest, ForgotPasswordResponse, LoginRequest, RegisterRequest, UpdatePasswordRequest, UpdatePasswordResponse } from "./types";
+import { isAborted } from "@/utils/errorHelpers";
 
 export const authConfig = (options?: AuthOptions) => ({
     signal: options?.signal,
@@ -7,6 +8,22 @@ export const authConfig = (options?: AuthOptions) => ({
     timeout: options?.timeout ?? 4000,
     headers: options?.headers ?? {},
 });
+
+function rethrowAuthError(error: unknown): never {
+    if (isAborted(error)) {
+        throw error;
+    }
+    if (axios.isAxiosError(error) && error.response?.status === 429) {
+        throw new Error("Too many requests. Please try again later.");
+    }
+    if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || error.message);
+    }
+    if (error instanceof Error) {
+        throw new Error(error.message);
+    }
+    throw new Error("An unknown error occurred.");
+}
 
 export async function handleAnonymousReady(): Promise<void> {
     try {
@@ -16,18 +33,7 @@ export async function handleAnonymousReady(): Promise<void> {
         );
     }
     catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-            throw new Error("Too many requests. Please try again later.");
-        }
-        else if (axios.isAxiosError(error)) {
-            throw new Error(error.response?.data?.message || error.message);
-        }
-        else if (error instanceof Error) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error("An unknown error occurred.");
-        }
+        rethrowAuthError(error);
     }
 }
 
@@ -43,18 +49,7 @@ export async function handleLogin(
         );
     }
     catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-            throw new Error("Too many requests. Please try again later.");
-        }
-        else if (axios.isAxiosError(error)) {
-            throw new Error(error.response?.data?.message || error.message);
-        }
-        else if (error instanceof Error) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error("An unknown error occurred.");
-        }
+        rethrowAuthError(error);
     }
 }
 
@@ -70,18 +65,7 @@ export async function handleRegister(
         );
     }
     catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-            throw new Error("Too many requests. Please try again later.");
-        }
-        else if (axios.isAxiosError(error)) {
-            throw new Error(error.response?.data?.message || error.message);
-        }
-        else if (error instanceof Error) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error("An unknown error occurred.");
-        }
+        rethrowAuthError(error);
     }
 }
 
@@ -94,18 +78,7 @@ export async function handleRefreshToken(): Promise<void> {
         )
     }
     catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-            throw new Error("Too many requests. Please try again later.");
-        }
-        else if (axios.isAxiosError(error)) {
-            throw new Error(error.response?.data?.message || error.message);
-        }
-        else if (error instanceof Error) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error("An unknown error occurred.");
-        }
+        rethrowAuthError(error);
     }
 }
 export async function handleLogout(): Promise<void> {
@@ -126,18 +99,7 @@ export async function handleUpdatePassword(updatePasswordRequest: UpdatePassword
         return response.data;
     }
     catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-            throw new Error("Too many requests. Please try again later.");
-        }
-        else if (axios.isAxiosError(error)) {
-            throw new Error(error.response?.data?.message || error.message);
-        }
-        else if (error instanceof Error) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error("An unknown error occurred.");
-        }
+        rethrowAuthError(error);
     }
 }
 
@@ -151,17 +113,6 @@ export async function handleForgotPassword(forgotPasswordRequest: ForgotPassword
         return response.data;
     }
     catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-            throw new Error("Too many requests. Please try again later.");
-        }
-        else if (axios.isAxiosError(error)) {
-            throw new Error(error.response?.data?.message || error.message);
-        }
-        else if (error instanceof Error) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error("An unknown error occurred.");
-        }
+        rethrowAuthError(error);
     }
 }

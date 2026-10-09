@@ -1,18 +1,14 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { authConfig } from "@/auth/api"
 import { AuthOptions } from "@/auth/types";
 import { toast } from "react-toastify";
-import { axiosErrorMessage } from "../utils/errorHelpers";
+import { axiosErrorMessage, isAborted } from "../utils/errorHelpers";
 
 export type UsageResponse = {
     usage: number;
     remaining_time: number;
     max_limit: number;
 };
-
-function isAborted(error: unknown): boolean {
-    return axios.isCancel(error) || (axios.isAxiosError(error) && error.code === "ERR_CANCELED");
-}
 
 export async function getAnalyzerUsage(options?: AuthOptions): Promise<UsageResponse | null> {
     try {

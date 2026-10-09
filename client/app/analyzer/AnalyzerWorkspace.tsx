@@ -14,6 +14,7 @@ import { AnalyzerLoading } from "./AnalyzerLoading";
 import { AnalyzerResults } from "./AnalyzerResults";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthOptions } from "@/auth/types";
+import { isAborted } from "@/utils/errorHelpers";
 
 type Phase = "idle" | "loading" | "done";
 
@@ -99,6 +100,7 @@ export function AnalyzerWorkspace() {
 
       router.push(`/analyzer/waiting/${data.job_id}`);
     } catch (error) {
+      if (isAborted(error)) return;
       if (controller.signal.aborted || controllerRef.current !== controller) return;
       const message =
         error instanceof Error ? error.message : "Analysis failed. Please try again.";

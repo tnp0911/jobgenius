@@ -2,7 +2,7 @@ import axios, { AxiosError } from "axios";
 import { authConfig } from "../auth/api";
 import { toast } from "react-toastify";
 import { AuthOptions } from "@/auth/types";
-import { axiosErrorMessage } from "@/utils/errorHelpers";
+import { axiosErrorMessage, isAborted } from "@/utils/errorHelpers";
 
 export async function jobSearchWithPrompt(
     resumePdf: File,
@@ -20,6 +20,7 @@ export async function jobSearchWithPrompt(
     );
     return data;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     const errorMessage = axiosErrorMessage(error, "Failed to search for jobs. Please try again later.");
     toast.error(errorMessage);
     console.error(errorMessage);
@@ -39,6 +40,7 @@ export async function getJobRecommendationsUnloggedInUser(): Promise<unknown> {
       );
       return data;
   } catch (error) {
+    if (isAborted(error)) throw error;
     console.error(error);
     if (error instanceof AxiosError && error.response?.status === 400) {
       toast.error(error.response.data.detail);
@@ -63,6 +65,7 @@ export async function getJobRecommendationsFreeUser(
     );
     return data;
   } catch (error) {
+    if (isAborted(error)) throw error;
     console.error(error);
     if (error instanceof AxiosError && error.response?.status === 400) {
       toast.error(error.response.data.detail);
@@ -93,6 +96,7 @@ export async function getJobRecommendationsPremiumUser(
     }
     return response.data;
   } catch (error) {
+    if (isAborted(error)) throw error;
     console.error(error);
     if (error instanceof AxiosError && error.response?.status === 400) {
       toast.error(error.response.data.detail);

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-import { axiosErrorMessage } from "../utils/errorHelpers";
+import { axiosErrorMessage, isAborted } from "../utils/errorHelpers";
 import { AuthOptions } from "@/auth/types";
 import { authConfig } from "@/auth/api";
 
@@ -30,6 +30,7 @@ export async function freeAnalyzeResume(
     );
     return data;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to analyze resume. Please try again later.");
     toast.error(errorMessage);
@@ -75,6 +76,7 @@ export async function premiumAnalyzeResumeRequest(
     );
     return data;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to analyze resume. Please try again later.");
     toast.error(errorMessage);
@@ -179,6 +181,7 @@ export async function premiumAnalyzeResumeResult(
     );
     return data;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to get analyze result. Please try again later.");
     toast.error(errorMessage);
@@ -203,6 +206,7 @@ export async function getResumes(options?: AuthOptions): Promise<Resume[] | null
     );
     return data;
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to get resumes. Please try again later.");
     console.error(errorMessage);
@@ -226,6 +230,7 @@ export async function getResume(resumeId: string, version?: number, options?: Au
       return data;
     }
   } catch (error: unknown) {
+    if (isAborted(error)) return null;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to get resume. Please try again later.");
     toast.error(errorMessage);
@@ -246,6 +251,7 @@ export async function deleteResume(
     );
     return true;
   } catch (error: unknown) {
+    if (isAborted(error)) return false;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to delete resume. Please try again later.");
     toast.error(errorMessage);

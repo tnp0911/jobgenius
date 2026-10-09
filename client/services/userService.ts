@@ -1,7 +1,7 @@
 import axios from "axios";
 import { authConfig } from "../auth/api";
-import { toast, ToastContent } from "react-toastify";
-import { axiosErrorMessage } from "../utils/errorHelpers";
+import { toast } from "react-toastify";
+import { axiosErrorMessage, isAborted } from "../utils/errorHelpers";
 import { AuthOptions } from "@/auth/types";
 
 export async function getAllUsers(options?: AuthOptions): Promise<unknown> {
@@ -12,6 +12,7 @@ export async function getAllUsers(options?: AuthOptions): Promise<unknown> {
         );
         return data;
     } catch (error: unknown) {
+        if (isAborted(error)) return null;
         const errorMessage = axiosErrorMessage(error, "Failed to get all users. Please try again later.");
         toast.error(errorMessage);
         console.error(errorMessage);
@@ -34,6 +35,7 @@ export async function getCurrentUser(
         );
         return data;
     } catch (error: unknown) {
+        if (isAborted(error)) return null;
         const errorMessage = axiosErrorMessage(error, "Failed to get current user. Please try again later.");
         if (axios.isAxiosError(error) && error.response?.status == 429) {
             toast.error(errorMessage);
@@ -51,6 +53,7 @@ export async function getUserPlan(): Promise<string | null> {
         );
         return data.plan as string;
     } catch (error: unknown) {
+        if (isAborted(error)) return null;
         const errorMessage = axiosErrorMessage(error, "Failed to get user plan. Please try again later.");
         if (axios.isAxiosError(error) && error.response?.status == 429) {
             toast.error(errorMessage);
