@@ -223,6 +223,7 @@ async def get_job_recommendations_free_user(
 async def get_job_recommendations_premium_user(
     request: Request,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    current_user: Annotated[UserResponse | None, Depends(get_current_user)],
     is_premium: Annotated[bool, Depends(is_premium_user)],
     resume_id: Annotated[str | None, Query()] = None,
     target_role: Annotated[str, Query()] = "any job",
@@ -230,17 +231,14 @@ async def get_job_recommendations_premium_user(
 ):
     """
     Get job recommendations for a premium user.
-    Uses Pinecone similarity on stored resume text; falls back to jobfinder agent
-    when no Pinecone matches are found.
+    Uses Pinecone similarity on stored resume text; falls back to free search
+    when no resume is stored, or to the jobfinder agent when Pinecone has no matches.
     """
     if not is_premium:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This action is only available to PREMIUM users.",
         )
-    city = ""
-    country = ""
-    country_code = ""
     try:
         ip = get_user_ip_address(request)
         if not ip:
@@ -254,10 +252,24 @@ async def get_job_recommendations_premium_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to get user's city and country",
             )
-            
+
         resolved_resume_id = await resolve_resume_id_for_recommendations(
             current_user_id, resume_id
         )
+        if resolved_resume_id is None:
+            # No stored resume — same search path as free tier; tell the client via header.
+            logger.info(
+                "No stored resume for premium user %s; falling back to free recommendations",
+                current_user_id,
+            )
+            response = await get_job_recommendations_free_user(
+                request=request,
+                current_user=current_user,
+                target_role=target_role,
+                seniority_level=seniority_level,
+            )
+            response.headers["fallback"] = "true"
+            return response
 
         cache_input = f"{resolved_resume_id}_{city}_{country_code}".lower().strip()
         cache_hash = hashlib.sha256(cache_input.encode()).hexdigest()[:16]
@@ -294,11 +306,6 @@ async def get_job_recommendations_premium_user(
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail=result["error"]
                 )
-            if not city or not country:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to get user's city and country",
-                )
 
             logger.info("Could not find jobs in Pinecone. Falling back to agent7_jobfinder")
             user_requirements = (
@@ -334,18 +341,9 @@ async def get_job_recommendations_premium_user(
     except HTTPException:
         raise
     except ValueError as e:
-        if "No stored resume found" in str(e):
-            
-            if cached:
-                return JSONResponse(
-                    status_code=status.HTTP_200_OK,
-                    content=json.loads(cached),
-                    headers={"fallback": "true"},
-                )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"No jobs found: {e!s}"
-            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"No jobs found: {e!s}"
+        )
     except Exception as e:
         logger.error(f"Error getting premium job recommendations: {e}")
         raise HTTPException(

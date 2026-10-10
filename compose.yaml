@@ -7,7 +7,7 @@ services:
       context: ./api_server
       dockerfile: Dockerfile
     container_name: api-server
-    image: currybon30/jobgenius-fastapi:2.1.0
+    image: currybon30/jobgenius-fastapi:2.1.1
     ports:
       - "8000:8000"
     env_file:
@@ -33,7 +33,7 @@ services:
   # Service 2: Arq Worker for background tasks
   worker:
     container_name: fastapi-worker
-    image: currybon30/jobgenius-fastapi:2.1.0
+    image: currybon30/jobgenius-fastapi:2.1.1
     command: ["arq", "app.bg_worker.WorkerSettings"]
     env_file:
       - ./api_server/.env
@@ -75,12 +75,15 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+    volumes:
+      - ${REDIS_DATA_DIR:-./redis_data}:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    command: redis-server --appendonly yes
   
   # Service 5: MongoDB
   mongodb:
@@ -246,3 +249,4 @@ volumes:
   localstack_data:
   ollama_data:
   ollama_webui_data:
+  redis_data:

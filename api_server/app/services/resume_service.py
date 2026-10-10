@@ -337,26 +337,34 @@ async def get_latest_resume_id_for_user(user_id: int) -> str | None:
 
 async def resolve_resume_id_for_recommendations(
     user_id: int, resume_id: str | None = None
-) -> str:
+) -> str | None:
+    """
+    Resolve which resume to use for premium recommendations.
+    Returns None when the user has no stored resume (caller may fall back to free search).
+    """
     try:
         if resume_id:
             rec = await get_resume_for_job_recommendation_from_mongodb(
                 user_id, resume_id
             )
             if not rec:
-                raise ValueError("Resume not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Resume not found",
+                )
             if rec.get("user_id") != user_id:
-                raise ValueError("Resume does not belong to this user")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Resume does not belong to this user",
+                )
             return resume_id
 
         latest_resume_id = await get_latest_resume_id_for_user(user_id)
         if not latest_resume_id:
-            raise ValueError(
-                "No stored resume found. Run premium resume analyze first."
-            )
+            logger.info("No stored resume found for user %s", user_id)
+            return None
         return latest_resume_id
-    except ValueError:
-        logger.info(f"No stored resume found for user {user_id}")
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error resolving resume id for recommendations: {e}")
