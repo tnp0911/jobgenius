@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 async def jobfinder_agent(
     resume_text: str,
-    analyzed_results_dict: dict | None = None,
     user_requirements: str = "",
 ):
     mcp_client_tools = await get_mcp_client_tools()
@@ -31,8 +30,8 @@ async def jobfinder_agent(
             "role": "system",
             "content": """
                 You are a job finder agent. You are provided with an original resume text 
-                An analyzed results dictionary from previous agents or user requirements are optional.
-                Your task is to find the best jobs for the user based on the original resume text and the analyzed results dictionary or user requirements.
+                User requirements is an optional input.
+                Your task is to find the best jobs for the user based on the original resume text and the user requirements.
                 You are also provided with a tool to search for jobs.
                 Note that you need to self-analyze the input to determine the best query to search for jobs for the user.
                 Allowed actions:
@@ -55,26 +54,15 @@ async def jobfinder_agent(
         }
     ]
 
-    if analyzed_results_dict:
-        messages.append(
-            {
-                "role": "user",
-                "content": f"""
-                    Original resume text: {resume_text}
-                    Analyzed results dictionary: {json.dumps(analyzed_results_dict, indent=2)}
-                """,
-            }
-        )
-    else:
-        messages.append(
-            {
-                "role": "user",
-                "content": f"""
-                    Original resume text: {resume_text}
-                    User requirements: {user_requirements}
-                """,
-            }
-        )
+    messages.append(
+        {
+            "role": "user",
+            "content": f"""
+                Original resume text: {resume_text}
+                User requirements: {user_requirements}
+            """,
+        }
+    )
 
     result = await agent.ainvoke({"messages": messages})
     if result["messages"][-1].content is None:
@@ -114,7 +102,7 @@ async def jobfinder_agent(
             "role": "user",
             "content": """
             You must use the jobs returned above only if there are any.
-            Explain why these jobs are the best fit for the user based on the original resume text and the analyzed results dictionary or user requirements.
+            Explain why these jobs are the best fit for the user based on the original resume text and the user requirements.
             Be concise and to the point.
             Use bullet points to list the reasons if it is appropriate.
             ONLY explain why these jobs are the best fit for the user.

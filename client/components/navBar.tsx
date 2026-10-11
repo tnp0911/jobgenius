@@ -199,7 +199,7 @@ export function NavBar() {
             <div
               className="site-version"
             >
-              <p>v1.1.0-beta</p>
+              <p>v3.0.0</p>
             </div>
           </div>
         </div>
