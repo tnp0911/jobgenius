@@ -1,6 +1,6 @@
 [project]
 name = "api-server"
-version = "2.2.0"
+version = "2.2.1"
 requires-python = ">=3.11.5,<3.12"
 dependencies = [
     "fastapi==0.135.3",
