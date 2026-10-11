@@ -52,7 +52,7 @@ export type PremiumAnalyzeResult = {
   ats: Record<string, unknown>;
   optimizer: Record<string, unknown>;
   feedback: Record<string, unknown> | string;
-  job_finder: Record<string, unknown> | unknown | null;
+  job_finder: Record<string, unknown> | string | null | unknown;
 };
 
 export async function premiumAnalyzeResumeRequest(

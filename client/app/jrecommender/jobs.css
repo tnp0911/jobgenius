@@ -318,7 +318,6 @@
   border-radius: 14px;
   background: rgba(37, 99, 235, 0.08);
   color: var(--ink-soft);
-  white-space: pre-wrap;
 }
 
 .jobs-status,
