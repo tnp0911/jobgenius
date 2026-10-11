@@ -948,6 +948,36 @@
   }
 }
 
+/* —— Job finder (premium includes_job_finder) —— */
+.analyzer-job-finder {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.3rem 1.4rem;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  background:
+    linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(255, 255, 255, 0.72));
+}
+
+.analyzer-job-finder-head {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.analyzer-job-finder-grid {
+  margin-top: 0.25rem;
+}
+
+.analyzer-job-finder-empty {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.analyzer-job-finder-message {
+  margin-top: 0.35rem;
+}
+
 @media (max-width: 640px) {
   .analyzer-pane {
     padding: 1.1rem;

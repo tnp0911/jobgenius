@@ -21,6 +21,7 @@ import {
 import { extractJobsPayload, type JobCardData } from "./jobNormalize";
 import { AuthOptions } from "@/auth/types";
 import { isAborted } from "@/utils/errorHelpers";
+import { renderAgentMarkdown } from "@/utils/agentMarkdown";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -564,8 +565,8 @@ export function JobRecommenderWorkspace() {
         </div>
 
         {promptMessage && mode === "prompt" && phase === "idle" ? (
-            <p className="jobs-ai-message">{promptMessage}</p>
-          ) : null}
+          <div className="jobs-ai-message">{renderAgentMarkdown(promptMessage)}</div>
+        ) : null}
 
         {phase === "loading" || phase === "searching" ? (
           isPremium && phase === "loading" && mode === "recommendations" ? (

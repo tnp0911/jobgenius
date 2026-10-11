@@ -1,0 +1,56 @@
+.agent-md {
+  display: grid;
+  gap: 0.75rem;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.agent-md-h {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.agent-md-h1,
+.agent-md-h2,
+.agent-md-h3 {
+  font-size: 1.08rem;
+}
+
+.agent-md-h4 {
+  font-size: 1rem;
+}
+
+.agent-md-p {
+  margin: 0;
+}
+
+.agent-md-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.agent-md-list-nested {
+  margin-top: 0.4rem;
+  gap: 0.35rem;
+  padding-left: 1.05rem;
+}
+
+.agent-md-li {
+  color: var(--ink-soft);
+}
+
+.agent-md-li-main {
+  color: var(--ink);
+}
+
+.agent-md strong {
+  color: var(--ink);
+  font-weight: 700;
+}
