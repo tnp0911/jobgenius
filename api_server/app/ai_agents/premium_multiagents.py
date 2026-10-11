@@ -83,19 +83,16 @@ async def agent6_node(state: GraphState) -> dict[str, Any]:
 
 
 async def agent7_node(state: GraphState) -> dict[str, Any]:
-    analyzed_results_dict = {
-        "intent": state.get("intent") or {},
-        "analyzer": state.get("analyzer") or {},
-    }
     messages, raw_jobs = await jobfinder_agent(
-        resume_text=state["resume_text"], analyzed_results_dict=analyzed_results_dict
+        resume_text=state["resume_text"],
+        user_requirements=state.get("user_goal") or "",
     )
     jobfinder_result = agent7_jobfinder_format_result(messages, raw_jobs)
     return {"job_finder": jobfinder_result}
 
 
 def includes_job_finder_edge(state: GraphState) -> Literal["agent7_jobfinder", "end"]:
-    if state.get("includes_job_finder") is True:
+    if state.get("includes_job_finder", False):
         return "agent7_jobfinder"
     else:
         return "end"
@@ -114,8 +111,9 @@ async def build_premium_graph():
     graph.add_edge("agent2_analyzer", "agent3_ats")
     graph.add_edge("agent3_ats", "agent4_optimizer")
     graph.add_edge("agent4_optimizer", "agent6_finalizer")
+    graph.add_edge("agent6_finalizer", END)
     graph.add_conditional_edges(
-        "agent6_finalizer",
+        START,
         includes_job_finder_edge,
         {
             "agent7_jobfinder": "agent7_jobfinder",

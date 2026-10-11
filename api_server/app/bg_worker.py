@@ -4,6 +4,7 @@ from typing import ClassVar
 
 from app.core.config import settings
 from app.db.arq import close_arq_pool, init_arq_pool
+from app.db.mcp import close_mcp_client, init_mcp_client
 from app.db.mongo import close_mongo, init_mongo
 from app.db.pinecone import close_pinecone, init_pinecone
 from app.db.redis import close_redis, init_redis
@@ -18,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 async def startup(ctx):
     await asyncio.gather(
-        init_mongo(), init_pinecone(), init_s3_client(), init_redis(), init_arq_pool()
+        init_mongo(),
+        init_pinecone(),
+        init_s3_client(),
+        init_redis(),
+        init_arq_pool(),
+        init_mcp_client(),
     )
     logger.info("Background ARQ worker started")
 
@@ -30,6 +36,7 @@ async def shutdown(ctx):
         close_s3_client(),
         close_redis(),
         close_arq_pool(),
+        close_mcp_client(),
     )
     logger.info("Background ARQ worker stopped")
 
