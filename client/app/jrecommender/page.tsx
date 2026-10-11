@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "../marketing.css";
+import "../../styles/agentMarkdown.css";
 import "./jobs.css";
 import { JobRecommenderWorkspace } from "./JobRecommenderWorkspace";
 

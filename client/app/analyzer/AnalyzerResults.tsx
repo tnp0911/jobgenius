@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect } from "react";
 import type {
   FreeAnalyzeResult,
   PremiumAnalyzeResult,
 } from "@/services/resumeService";
+import {
+  extractJobsPayload,
+  type JobCardData,
+} from "@/app/jrecommender/jobNormalize";
+import { renderAgentMarkdown } from "@/utils/agentMarkdown";
 
 type AnalyzerResultsProps = {
   result: FreeAnalyzeResult | PremiumAnalyzeResult;
@@ -32,6 +38,12 @@ function scorePercent(value: unknown): number | null {
   return Math.round(Math.min(100, Math.max(0, pct)));
 }
 
+function isPremiumResult(
+  result: FreeAnalyzeResult | PremiumAnalyzeResult,
+): result is PremiumAnalyzeResult {
+  return "optimizer" in result || "job_finder" in result;
+}
+
 function ScoreChip({ label, value }: { label: string; value: unknown }) {
   const pct = scorePercent(value);
   if (pct === null) return null;
@@ -56,6 +68,117 @@ function TagList({ items }: { items: string[] }) {
   );
 }
 
+function AnalyzerJobCard({ job }: { job: JobCardData }) {
+  const scorePct =
+    typeof job.matchScore === "number"
+      ? Math.round(
+          Math.min(
+            100,
+            Math.max(0, job.matchScore <= 1 ? job.matchScore * 100 : job.matchScore),
+          ),
+        )
+      : null;
+
+  return (
+    <article className="jobs-card">
+      <div className="jobs-card-top">
+        {job.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="jobs-card-logo" src={job.logo} alt="" />
+        ) : (
+          <div className="jobs-card-logo jobs-card-logo-fallback" aria-hidden="true">
+            {job.company.slice(0, 1).toUpperCase() || "J"}
+          </div>
+        )}
+        <div className="jobs-card-heading">
+          <h3 className="jobs-card-title">{job.title}</h3>
+          <p className="jobs-card-company">{job.company}</p>
+        </div>
+        {scorePct !== null ? (
+          <span className="jobs-card-score" title="Match score">
+            {scorePct}%
+          </span>
+        ) : null}
+      </div>
+
+      <p className="jobs-card-meta">
+        <span>{job.location}</span>
+        {job.remote ? <span className="jobs-card-pill">Remote</span> : null}
+        {job.employmentType ? (
+          <span className="jobs-card-pill">{job.employmentType}</span>
+        ) : null}
+      </p>
+
+      {job.salary ? <p className="jobs-card-salary">{job.salary}</p> : null}
+
+      {job.description ? <p className="jobs-card-desc">{job.description}</p> : null}
+
+      {job.skills.length > 0 ? (
+        <ul className="jobs-card-skills">
+          {job.skills.map((skill) => (
+            <li key={skill}>{skill}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {job.applyLink ? (
+        <a
+          className="mkt-btn mkt-btn-primary jobs-card-apply"
+          href={job.applyLink}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View posting
+        </a>
+      ) : (
+        <span className="jobs-card-apply-disabled">No apply link</span>
+      )}
+    </article>
+  );
+}
+
+function JobFinderSection({ jobFinder }: { jobFinder: unknown }) {
+  if (jobFinder == null) return null;
+
+  const payload = extractJobsPayload(jobFinder);
+  const finderRecord = asRecord(jobFinder);
+  const error = asString(finderRecord.error);
+  const message = payload.message || asString(finderRecord.message);
+
+  return (
+    <section className="analyzer-job-finder" aria-labelledby="analyzer-job-finder-title">
+      <div className="analyzer-job-finder-head">
+        <p className="analyzer-results-kicker">AI Job Finder</p>
+        <h3 id="analyzer-job-finder-title" className="analyzer-results-block-title">
+          Roles matched to your resume
+        </h3>
+        {message ? (
+          <div className="analyzer-job-finder-message">
+            {renderAgentMarkdown(message)}
+          </div>
+        ) : null}
+        {error && payload.jobs.length === 0 ? (
+          <p className="analyzer-job-finder-empty" role="status">
+            {error}
+          </p>
+        ) : null}
+      </div>
+
+      {payload.jobs.length > 0 ? (
+        <div className="jobs-grid analyzer-job-finder-grid" aria-label="Matched jobs">
+          {payload.jobs.map((job) => (
+            <AnalyzerJobCard key={job.id} job={job} />
+          ))}
+        </div>
+      ) : !error ? (
+        <p className="analyzer-job-finder-empty" role="status">
+          No matching roles were returned for this run.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function AnalyzerResults({ result, onAnalyzeAgain }: AnalyzerResultsProps) {
   const intent = asRecord(result.intent);
   const analyzer = asRecord(result.analyzer);
@@ -64,6 +187,7 @@ export function AnalyzerResults({ result, onAnalyzeAgain }: AnalyzerResultsProps
     typeof result.feedback === "string"
       ? { summary: result.feedback }
       : asRecord(result.feedback);
+  const jobFinder = isPremiumResult(result) ? result.job_finder : null;
 
   const targetRole = asString(intent.target_role);
   const seniority = asString(intent.seniority_level);
@@ -75,8 +199,14 @@ export function AnalyzerResults({ result, onAnalyzeAgain }: AnalyzerResultsProps
   const missingSoft = asStringList(analyzer.missing_soft_skills);
   const suggestions = asStringList(feedback.simple_suggestions);
 
-  sessionStorage.setItem("targetRole", targetRole);
-  sessionStorage.setItem("seniority", seniority);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("targetRole", targetRole);
+      sessionStorage.setItem("seniority", seniority);
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [targetRole, seniority]);
 
   return (
     <div className="analyzer-results">
@@ -180,6 +310,8 @@ export function AnalyzerResults({ result, onAnalyzeAgain }: AnalyzerResultsProps
           </section>
         ) : null}
       </div>
+
+      <JobFinderSection jobFinder={jobFinder} />
     </div>
   );
 }
