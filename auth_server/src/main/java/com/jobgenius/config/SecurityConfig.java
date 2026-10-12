@@ -39,8 +39,8 @@ import java.util.Objects;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Value("${REACT_URL}")
-    private String reactUrl;
+    @Value("${FRONTEND_URL}")
+    private String frontendUrl;
     private final APILoggingFilter apiLoggingFilter;
     private final JwtAuthFilter jwtAuthFilter;
     private final RateLimitingFilter rateLimitingFilter;
@@ -143,7 +143,7 @@ public class SecurityConfig {
                                 res.addHeader(HttpHeaders.SET_COOKIE,
                                         anonymousUuid.toString());
                         
-                                res.sendRedirect(reactUrl); 
+                                res.sendRedirect(frontendUrl); 
                                 })
                                 .failureUrl("http://localhost:3000/error") // Redirect after failed
                         // OAuth2 login, change this
