@@ -1,10 +1,14 @@
 package com.jobgenius.services;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-
+import com.jobgenius.dto.FastAPICreateRequest;
+import com.jobgenius.dto.LoginRequest;
+import com.jobgenius.dto.RegisterRequest;
 import com.jobgenius.models.RefreshToken;
+import com.jobgenius.models.User;
+import com.jobgenius.repositories.RefreshTokenRepository;
+import com.jobgenius.repositories.UserRepository;
+import com.jobgenius.utils.TokenHelper;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,15 +16,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import com.jobgenius.dto.FastAPICreateRequest;
-import com.jobgenius.dto.LoginRequest;
-import com.jobgenius.dto.RegisterRequest;
-import com.jobgenius.models.User;
-import com.jobgenius.repositories.RefreshTokenRepository;
-import com.jobgenius.repositories.UserRepository;
-import com.jobgenius.utils.TokenHelper;
-
-import lombok.RequiredArgsConstructor;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 @Service
@@ -46,6 +44,7 @@ public class AuthService {
                     // MERGE: enable password login too
                     user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
                     user.setProvider("BOTH");
+                    user.setVerified(true);
                 }
             }
 
