@@ -132,7 +132,8 @@ public class EmailVerificationService {
 
     @Transactional
     public void sendVerificationEmail(User user) {
-        if (user.isVerified()) {
+        boolean isVerified = Boolean.TRUE.equals(user.isVerified());
+        if (isVerified) {
             throw new EmailAlreadyVerifiedException();
         }
 
@@ -173,7 +174,8 @@ public class EmailVerificationService {
                         "No user found with the provided email."
                 ));
 
-        if (user.isVerified()) {
+        boolean isVerified = Boolean.TRUE.equals(user.isVerified());
+        if (isVerified) {
             throw new EmailAlreadyVerifiedException();
         }
 
