@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function PaymentSuccessExperience() {
-  const { refreshAuth, tier } = useAuth();
+  const { status, refreshAuth, tier } = useAuth();
 
   useEffect(() => {
     void refreshAuth(); // this call is used to refresh the auth status and get the latest user plan

@@ -9,6 +9,7 @@ import "./register.css";
 import { handleRegister } from "@/auth/api";
 import { RegisterRequest } from "@/auth/types";
 import { isAborted } from "@/utils/errorHelpers";
+import { sendEmailVerification } from "@/services/emailVerificationService";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -49,8 +50,11 @@ export function RegisterForm() {
       };
       await handleRegister(registerRequest, { signal: controller.signal });
       if (controllerRef.current !== controller) return;
-      router.replace("/login");
-      toast.success("Registration successful");
+      const message = await sendEmailVerification(email);
+      toast.success("Registration successful." + (message ? " " + message : ""));
+      setTimeout(() => {
+        router.push("/login");
+      }, 5000);
     } catch (error: unknown) {
       if (isAborted(error)) return;
       if (axios.isAxiosError(error)) {

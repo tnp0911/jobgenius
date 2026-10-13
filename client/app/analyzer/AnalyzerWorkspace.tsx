@@ -12,9 +12,10 @@ import { ResumeDropzone } from "./ResumeDropzone";
 import { JobBriefPanel } from "./JobBriefPanel";
 import { AnalyzerLoading } from "./AnalyzerLoading";
 import { AnalyzerResults } from "./AnalyzerResults";
-import { useAuth } from "@/contexts/AuthContext";
+import { needsEmailVerification, useAuth } from "@/contexts/AuthContext";
 import { AuthOptions } from "@/auth/types";
 import { isAborted } from "@/utils/errorHelpers";
+import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 
 type Phase = "idle" | "loading" | "done";
 
@@ -27,6 +28,7 @@ export function AnalyzerWorkspace() {
   const [includesJobFinder, setIncludesJobFinder] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<FreeAnalyzeResult | null>(null);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -34,6 +36,12 @@ export function AnalyzerWorkspace() {
       controllerRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    // Verified users (and guests) keep using the service with no modal.
+    // Unverified users are asked again on every visit to this page.
+    setVerifyModalOpen(needsEmailVerification(status));
+  }, [status]);
 
   async function onAnalyze() {
     controllerRef.current?.abort();
@@ -130,6 +138,13 @@ export function AnalyzerWorkspace() {
 
   return (
     <div className="analyzer-workspace">
+      <EmailVerificationModal
+        open={verifyModalOpen}
+        onClose={() => {
+          setVerifyModalOpen(false);
+          router.push("/");
+        }}
+      />
       <div className="analyzer-split" aria-label="Resume and job brief">
         <section className="analyzer-pane analyzer-pane-upload" aria-labelledby="analyzer-upload-title">
           <div className="analyzer-pane-head">
@@ -166,7 +181,7 @@ export function AnalyzerWorkspace() {
             onRequirementsChange={setRequirements}
             onIncludesJobFinderChange={setIncludesJobFinder}
             isPremium={
-              status === "authenticated" && tier?.toLowerCase() === "premium"
+              status.status === "authenticated" && tier?.toLowerCase() === "premium"
             }
           />
         </section>

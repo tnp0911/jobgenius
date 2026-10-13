@@ -10,22 +10,38 @@ import { handleLogin } from "@/auth/api";
 import { LoginRequest } from "@/auth/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAborted } from "@/utils/errorHelpers";
+import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 
 import "./login.css";
 
 export function LoginForm() {
   const router = useRouter();
-  const { refreshAuth } = useAuth();
+  const { status, refreshAuth } = useAuth();
   const controllerRef = useRef<AbortController | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (status.status === "authenticated") {
+      if (status.verified) {
+        goHome();
+      } else {
+        setVerifyModalOpen(true);
+      }
+    }
+  }, [status, router]);
 
   useEffect(() => {
     return () => {
       controllerRef.current?.abort();
     };
   }, []);
+
+  const goHome = () => {
+    router.push("/");
+  };
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,10 +62,14 @@ export function LoginForm() {
 
       if (controllerRef.current !== controller) return;
 
-      await refreshAuth();
+      const next = await refreshAuth();
+      // Only nudge unverified accounts; verified users go straight in.
+      if (next.status === "authenticated" && next.verified === false) {
+        setVerifyModalOpen(true);
+        return;
+      }
       toast.success("Login successful");
-
-      router.push("/");
+      goHome();
     } catch (error: unknown) {
       if (isAborted(error) || controller.signal.aborted) return;
 
@@ -68,6 +88,14 @@ export function LoginForm() {
 
   return (
     <div className="wrapper">
+      <EmailVerificationModal
+        open={verifyModalOpen}
+        email={email}
+        onClose={() => {
+          setVerifyModalOpen(false);
+          goHome();
+        }}
+      />
       <h2>Login to JobGenius</h2>
 
       <form onSubmit={handleSubmit} className="login-form">

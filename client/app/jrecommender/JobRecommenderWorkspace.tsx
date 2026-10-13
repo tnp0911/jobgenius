@@ -2,6 +2,7 @@
 
 import axios from "axios";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useId,
@@ -11,7 +12,7 @@ import {
   type DragEvent,
 } from "react";
 import { toast } from "react-toastify";
-import { useAuth } from "@/contexts/AuthContext";
+import { needsEmailVerification, useAuth } from "@/contexts/AuthContext";
 import {
   getJobRecommendationsFreeUser,
   getJobRecommendationsPremiumUser,
@@ -22,6 +23,7 @@ import { extractJobsPayload, type JobCardData } from "./jobNormalize";
 import { AuthOptions } from "@/auth/types";
 import { isAborted } from "@/utils/errorHelpers";
 import { renderAgentMarkdown } from "@/utils/agentMarkdown";
+import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -262,6 +264,7 @@ function ResumePromptDropzone({
 }
 
 export function JobRecommenderWorkspace() {
+  const router = useRouter();
   const { status, tier } = useAuth();
   const isPremium = tier?.toLowerCase() === "premium";
 
@@ -277,6 +280,7 @@ export function JobRecommenderWorkspace() {
   const [targetRole, setTargetRole] = useState("");
   const [seniorityLevel, setSeniorityLevel] = useState("");
   const [fallbackUsed, setFallbackUsed] = useState(false);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -285,7 +289,23 @@ export function JobRecommenderWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (status === "loading") return;
+    // Verified users (and guests) keep using the service with no modal.
+    // Unverified users are asked again on every visit to this page.
+    setVerifyModalOpen(needsEmailVerification(status));
+  }, [status]);
+
+  useEffect(() => {
+    if (status.status === "loading") return;
+
+    // Skip server calls for signed-in users who have not verified email.
+    if (needsEmailVerification(status)) {
+      setPhase("idle");
+      setJobs([]);
+      setPromptJobs([]);
+      setPromptMessage(null);
+      setError(null);
+      return;
+    }
 
     let cancelled = false;
 
@@ -311,7 +331,7 @@ export function JobRecommenderWorkspace() {
 
       try {
         let data: unknown;
-        if (status === "unauthenticated") {
+        if (status.status === "unauthenticated") {
           data = await getJobRecommendationsUnloggedInUser();
         } else if (isPremium) {
           data = await getJobRecommendationsPremiumUser("", role, seniority, setFallbackUsed);
@@ -344,6 +364,10 @@ export function JobRecommenderWorkspace() {
   }, [status, isPremium]);
 
   async function refreshFreeRecommendations() {
+    if (needsEmailVerification(status)) {
+      setVerifyModalOpen(true);
+      return;
+    }
     setPhase("loading");
     setError(null);
     setMode("recommendations");
@@ -365,6 +389,10 @@ export function JobRecommenderWorkspace() {
   }
 
   async function refreshPremiumRecommendations() {
+    if (needsEmailVerification(status)) {
+      setVerifyModalOpen(true);
+      return;
+    }
     setPhase("loading");
     setError(null);
     setMode("recommendations");
@@ -386,6 +414,10 @@ export function JobRecommenderWorkspace() {
   }
 
   async function onPromptSearch() {
+    if (needsEmailVerification(status)) {
+      setVerifyModalOpen(true);
+      return;
+    }
 
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -429,7 +461,7 @@ export function JobRecommenderWorkspace() {
     }
   }
 
-  if (status === "loading") {
+  if (status.status === "loading") {
     return (
       <div className="jobs-status" aria-busy="true">
         Checking your session…
@@ -442,7 +474,14 @@ export function JobRecommenderWorkspace() {
 
   return (
     <div className="jobs-workspace">
-      {status === "authenticated" ? (
+      <EmailVerificationModal
+        open={verifyModalOpen}
+        onClose={() => {
+          setVerifyModalOpen(false);
+          router.push("/");
+        }}
+      />
+      {status.status === "authenticated" ? (
         <section className="jobs-prompt-panel" aria-labelledby="jobs-prompt-title">
           <div className="jobs-pane-head">
             <p className="jobs-pane-kicker">
@@ -517,7 +556,7 @@ export function JobRecommenderWorkspace() {
             <h2 id="jobs-results-title" className="jobs-pane-title">
               {mode === "prompt"
                 ? "Jobs from your prompt"
-                : status === "authenticated"
+                : status.status === "authenticated"
                   ? (isPremium && !fallbackUsed)
                     ? "Matched to your latest resume"
                     : "Suggested for you"
@@ -536,7 +575,7 @@ export function JobRecommenderWorkspace() {
               </button>
             ) : null}
 
-            {status === "authenticated" && !isPremium && mode === "recommendations" ? (
+            {status.status === "authenticated" && !isPremium && mode === "recommendations" ? (
               <button
                 type="button"
                 className="mkt-btn mkt-btn-ghost"
@@ -549,7 +588,7 @@ export function JobRecommenderWorkspace() {
               </button>
             ) : null}
 
-            {status === "authenticated" && isPremium && mode === "recommendations" ? (
+            {status.status === "authenticated" && isPremium && mode === "recommendations" ? (
               <button
                 type="button"
                 className="mkt-btn mkt-btn-ghost"

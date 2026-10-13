@@ -1,0 +1,182 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+.verify-email-container {
+  box-sizing: border-box;
+  margin-top: 75px !important;
+  margin-bottom: 75px !important;
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0;
+  --page-bg: #e6effc;
+  background: var(--page-bg);
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.wrapper {
+  width: 100%;
+  max-width: 460px;
+  padding: 2rem;
+  border-radius: 16px;
+  background: rgba(243, 244, 246, 0.62);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.wrapper h2 {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #2563eb;
+  letter-spacing: 0.2px;
+}
+
+.verify-email-subtitle {
+  margin: 0 0 1.4rem;
+  text-align: center;
+  font-size: 0.93rem;
+  color: #64748b;
+}
+
+.verify-email-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.input-field {
+  position: relative;
+}
+
+.input-field input {
+  width: 100%;
+  height: 52px;
+  padding: 1.15rem 0.9rem 0.35rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  outline: none;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-family: inherit;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.input-field label {
+  position: absolute;
+  top: 50%;
+  left: 0.8rem;
+  transform: translateY(-50%);
+  padding: 0 0.3rem;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 0.94rem;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.input-field input:focus,
+.input-field input:valid {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.input-field input:focus + label,
+.input-field input:valid + label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 0.76rem;
+  color: #2563eb;
+}
+
+.verify-email-form button {
+  width: 100%;
+  height: 50px;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.verify-email-form button:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.verify-email-form button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.verify-email-form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.verify-email-primary-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 50px;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.verify-email-primary-link:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.verify-email-bottom {
+  margin-top: 0.9rem;
+  text-align: center;
+}
+
+.login-link {
+  margin: 0;
+  font-size: 0.93rem;
+  color: #475569;
+}
+
+.login-link a {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-link a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .wrapper {
+    padding: 1.25rem 1rem;
+    border-radius: 14px;
+  }
+
+  .wrapper h2 {
+    font-size: 1.35rem;
+  }
+
+  .input-field input {
+    height: 48px;
+    font-size: 0.95rem;
+  }
+}

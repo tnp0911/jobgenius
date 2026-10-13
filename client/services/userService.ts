@@ -23,6 +23,7 @@ export async function getAllUsers(options?: AuthOptions): Promise<unknown> {
 export type CurrentUser = {
     name: string;
     email: string;
+    emailVerified: boolean;
 };
 
 export async function getCurrentUser(

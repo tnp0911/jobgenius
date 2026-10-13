@@ -63,7 +63,7 @@ export function Footer() {
           <div className="site-footer-col">
             <h3>Account</h3>
             <ul>
-              {status === "unauthenticated" ? ACCOUNT_LINKS.map(({ label, href }) => (
+              {status.status === "unauthenticated" ? ACCOUNT_LINKS.map(({ label, href }) => (
                 <li key={href}>
                   <Link href={href}>{label}</Link>
                 </li>

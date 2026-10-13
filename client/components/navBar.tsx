@@ -140,7 +140,7 @@ export function NavBar() {
   };
 
   const renderPlanBanner = () => {
-    if (status !== "authenticated") return null;
+    if (status.status !== "authenticated") return null;
 
     return tier?.toLowerCase() === "free" ? (
       <button
@@ -156,11 +156,11 @@ export function NavBar() {
   };
 
   const renderAuthAction = () => {
-    if (status === "loading") {
+    if (status.status === "loading") {
       return <AuthActionSkeleton />;
     }
 
-    if (status === "authenticated") {
+    if (status.status === "authenticated") {
       return (
         <div
           className={`profile-menu${profileOpen ? " is-open" : ""}`}
@@ -199,7 +199,7 @@ export function NavBar() {
             <div
               className="site-version"
             >
-              <p>v3.1.0</p>
+              <p>v4.0.0</p>
             </div>
           </div>
         </div>

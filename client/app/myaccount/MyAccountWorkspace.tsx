@@ -68,11 +68,11 @@ export function MyAccountWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status.status !== "authenticated") return;
     void loadUser();
   }, [status, loadUser]);
 
-  if (status === "loading") {
+  if (status.status === "loading") {
     return (
       <div className="account-status" aria-busy="true">
         Checking your session…
@@ -80,7 +80,7 @@ export function MyAccountWorkspace() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (status.status === "unauthenticated") {
     return (
       <section className="account-pane account-gate" aria-labelledby="account-gate-title">
         <p className="account-pane-kicker">Account required</p>
