@@ -65,7 +65,7 @@ public class EmailVerificationService {
     private String buildVerificationLink(String rawToken) {
         return UriComponentsBuilder
                 .fromUriString(frontendUrl)
-                .path("/verify-registration")
+                .path("/register/verify_email")
                 .queryParam("token", rawToken)
                 .build()
                 .encode()
@@ -87,16 +87,12 @@ public class EmailVerificationService {
         emailVerificationTokenRepository.save(token);
 
         String link = buildVerificationLink(rawToken);
-        emailService.sendEmail(
-                user.getEmail(),
-                "Verify your JobGenius account",
-                """
+        String plainText = """
                 Hi there,
 
                 Thank you for signing up to JobGenius!
 
-                Please click the link below to verify your account:
-
+                Please verify your account by opening this link:
                 %s
 
                 This link will expire in %d hours.
@@ -105,8 +101,33 @@ public class EmailVerificationService {
 
                 Best regards,
                 The JobGenius Team
-                """.formatted(link, TOKEN_EXPIRATION_TIME)
-            );
+                """.formatted(link, TOKEN_EXPIRATION_TIME);
+
+        String htmlBody = """
+                <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5;color:#1f2937;max-width:560px;margin:0 auto;padding:24px;">
+                  <p style="margin:0 0 16px;">Hi there,</p>
+                  <p style="margin:0 0 16px;">Thank you for signing up to JobGenius!</p>
+                  <p style="margin:0 0 24px;">Please click the button below to verify your account:</p>
+                  <p style="margin:0 0 24px;text-align:center;">
+                    <a href="%s"
+                       style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">
+                      Verify my email
+                    </a>
+                  </p>
+                  <p style="margin:0 0 16px;color:#6b7280;font-size:14px;">
+                    This link will expire in %d hours.
+                  </p>
+                  <p style="margin:0 0 16px;">If you did not request this verification, please ignore this email.</p>
+                  <p style="margin:0;">Best regards,<br>The JobGenius Team</p>
+                </div>
+                """.formatted(link, TOKEN_EXPIRATION_TIME);
+
+        emailService.sendHtmlEmail(
+                user.getEmail(),
+                "Verify your JobGenius account",
+                plainText,
+                htmlBody
+        );
     }
 
     @Transactional

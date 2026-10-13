@@ -1,8 +1,11 @@
 package com.jobgenius.services.mailing;
 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,5 +22,19 @@ public class EmailService {
         message.setText(body);
 
         mailSender.send(message);
+    }
+
+    public void sendHtmlEmail(String to, String subject, String plainText, String htmlBody) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom("no-reply@jobgenius.com");
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(plainText, htmlBody);
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new IllegalStateException("Failed to send HTML email", e);
+        }
     }
 }
