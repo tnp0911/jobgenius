@@ -482,12 +482,12 @@ export function BillingSubscriptionWorkspace() {
   }, [cancelModalOpen, cancelBusy]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status.status !== "authenticated") return;
     void loadUsage();
   }, [status, loadUsage]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !isPremium) {
+    if (status.status !== "authenticated" || !isPremium) {
       setNextBillingDate(null);
       setCancelAtPeriodEnd(false);
       setInvoices([]);
@@ -498,7 +498,7 @@ export function BillingSubscriptionWorkspace() {
     void loadPremiumBilling();
   }, [status, isPremium, loadPremiumBilling]);
 
-  if (status === "loading") {
+  if (status.status === "loading") {
     return (
       <div className="billing-status" aria-busy="true">
         Checking your session…
@@ -506,7 +506,7 @@ export function BillingSubscriptionWorkspace() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (status.status === "unauthenticated") {
     return (
       <section className="billing-gate" aria-labelledby="billing-gate-title">
         <p className="billing-pane-kicker">Account required</p>

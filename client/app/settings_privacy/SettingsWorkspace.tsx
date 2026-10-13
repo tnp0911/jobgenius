@@ -52,7 +52,7 @@ export function SettingsWorkspace() {
     }
   };
 
-  if (status === "loading") {
+  if (status.status === "loading") {
     return (
       <div className="settings-status" aria-busy="true">
         Checking your session…
@@ -60,7 +60,7 @@ export function SettingsWorkspace() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (status.status === "unauthenticated") {
     return (
       <section className="settings-pane settings-gate" aria-labelledby="settings-gate-title">
         <p className="settings-pane-kicker">Account required</p>

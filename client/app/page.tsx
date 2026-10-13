@@ -138,7 +138,7 @@ export default function Home() {
   const { status } = useAuth();
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (status.status === "unauthenticated") {
       handleAnonymousReady();
     }
   }, [status]);
@@ -160,7 +160,7 @@ export default function Home() {
               forward without the guesswork.
             </p>
             <div className="mkt-cta-row mkt-rise mkt-rise-delay-2">
-              {status === "unauthenticated" ? (
+              {status.status === "unauthenticated" ? (
                 <Link href="/register" className="mkt-btn mkt-btn-primary">
                   Start free
                 </Link>
@@ -243,9 +243,9 @@ export default function Home() {
       <section className="home-bottom-cta" aria-labelledby="home-bottom-title">
         <div className="mkt-shell">
           <h2 id="home-bottom-title">Ready when you are.</h2>
-          <p>{status === "unauthenticated" ? "Create a free account and take the first clear step today." : "Take the first clear step today."}</p>
+          <p>{status.status === "unauthenticated" ? "Create a free account and take the first clear step today." : "Take the first clear step today."}</p>
           <div className="mkt-cta-row">
-            {status === "unauthenticated" ? (
+            {status.status === "unauthenticated" ? (
               <Link href="/register" className="mkt-btn mkt-btn-primary">
                 Create account
               </Link>

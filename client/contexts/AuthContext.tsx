@@ -14,7 +14,10 @@ import { handleRefreshToken } from "@/auth/api";
 import { getCurrentUser } from "@/services/userService";
 import { getUserPlan } from "@/services/userService";
 
-export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+export type AuthStatus = {
+  status: "loading" | "authenticated" | "unauthenticated";
+  verified: boolean;
+};
 
 const AUTH_STATUS_STORAGE_KEY = "jobgenius_auth_status";
 /** Access JWT TTL is 15 minutes — refresh slightly early to avoid expiry races. */
@@ -25,7 +28,7 @@ const MIN_VISIBILITY_REFRESH_GAP_MS = 2 * 60 * 1000;
 export type AuthContextValue = {
   status: AuthStatus;
   tier: string | null;
-  refreshAuth: () => Promise<void>;
+  refreshAuth: () => Promise<AuthStatus>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -33,15 +36,25 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function readStoredStatus(): AuthStatus | null {
   if (typeof window === "undefined") return null;
   const stored = sessionStorage.getItem(AUTH_STATUS_STORAGE_KEY);
-  if (stored === "authenticated" || stored === "unauthenticated") {
-    return stored;
+  const parsed = stored ? JSON.parse(stored) : null;
+  if (parsed?.status === "authenticated" || parsed?.status === "unauthenticated") {
+    return {
+      status: parsed.status,
+      // Only an explicit false means unverified; missing/legacy cache must not open the modal.
+      verified: parsed.verified !== false,
+    };
   }
   return null;
 }
 
+/** True only for signed-in users who still need email verification. */
+export function needsEmailVerification(status: AuthStatus): boolean {
+  return status.status === "authenticated" && status.verified === false;
+}
+
 function persistStatus(status: AuthStatus) {
-  if (typeof window === "undefined" || status === "loading") return;
-  sessionStorage.setItem(AUTH_STATUS_STORAGE_KEY, status);
+  if (typeof window === "undefined" || status.status === "loading") return;
+  sessionStorage.setItem(AUTH_STATUS_STORAGE_KEY, JSON.stringify(status));
 }
 
 function clearStoredStatus() {
@@ -62,15 +75,24 @@ async function resolveAuthStatus(): Promise<AuthStatus> {
         );
       }),
     ]);
-    return user ? "authenticated" : "unauthenticated";
+    return user ? {
+        status: "authenticated",
+        verified: user.emailVerified,
+      } : {
+        status: "unauthenticated",
+        verified: false,
+      };
   } catch {
-    return "unauthenticated";
+    return {
+      status: "unauthenticated",
+      verified: false,
+    };
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Always "loading" on first render so SSR and client markup match (no sessionStorage in useState).
-  const [status, setStatus] = useState<AuthStatus>("loading"); // status: "loading" | "authenticated" | "unauthenticated"
+  const [status, setStatus] = useState<AuthStatus>({ status: "loading", verified: false });
   const [tier, setTier] = useState<string | null>(null);
   const initialFetchDoneRef = useRef(false);
   const fetchInFlightRef = useRef<Promise<AuthStatus> | null>(null);
@@ -79,21 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const markLoggedOut = useCallback(() => {
     clearStoredStatus();
-    setStatus("unauthenticated");
+    setStatus({ status: "unauthenticated", verified: false });
     setTier(null);
   }, []);
 
-  const refreshAuth = useCallback(async () => {
+  const refreshAuth = useCallback(async (): Promise<AuthStatus> => {
     if (fetchInFlightRef.current) {
-      await fetchInFlightRef.current;
-      return;
+      return fetchInFlightRef.current;
     }
 
     const run = (async () => {
       const next = await resolveAuthStatus();
       setStatus(next);
       persistStatus(next);
-      if (next === "authenticated") {
+      if (next.status === "authenticated") {
         const nextTier = await getUserPlan();
         setTier(nextTier);
       } else {
@@ -104,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     fetchInFlightRef.current = run;
     try {
-      await run;
+      return await run;
     } finally {
       fetchInFlightRef.current = null;
     }
@@ -133,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Refresh can fail from token-rotation races while cookies are still valid.
           // Only clear the UI session if the access cookie also fails.
-          const stillAuthed = (await resolveAuthStatus()) === "authenticated";
+          const stillAuthed = (await resolveAuthStatus()).status === "authenticated";
           if (stillAuthed) {
             lastTokenRefreshAtRef.current = Date.now();
             return;
@@ -167,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const next = await resolveAuthStatus();
       setStatus(next);
       persistStatus(next);
-      if (next === "authenticated") {
+      if (next.status === "authenticated") {
         const nextTier = await getUserPlan();
         setTier(nextTier);
       } else {
@@ -178,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Keep access token fresh while the user stays authenticated.
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status.status !== "authenticated") return;
 
     // Interval must refresh even within the visibility gap.
     const intervalId = window.setInterval(() => {

@@ -31,7 +31,7 @@ export function PlansUpgradeButton({
   const isPremium = tier?.toLowerCase() === "premium";
 
   async function onUpgrade() {
-    if (status !== "authenticated") {
+    if (status.status !== "authenticated") {
       toast.info("Sign in to upgrade to Premium.");
       router.push("/login");
       return;
