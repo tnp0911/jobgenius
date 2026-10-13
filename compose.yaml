@@ -51,7 +51,7 @@ services:
       context: ./auth_server
       dockerfile: Dockerfile
     container_name: auth-server
-    image: currybon30/jobgenius-spring:2.1.1
+    image: currybon30/jobgenius-spring:2.2.0
     ports:
       - "5000:5000"
     env_file:
@@ -60,6 +60,7 @@ services:
       - redis
       - mysql
       - api_server
+      - mailpit
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
@@ -194,26 +195,26 @@ services:
     command: listen --api-key ${STRIPE_SECRET_KEY} --forward-to http://auth-server:5000/api/stripe/webhook --skip-update --skip-verify
 
   # Service 10: Ollama
-  ollama:
-    container_name: ollama
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ${OLLAMA_DATA_DIR:-./ollama_data}:/root/.ollama
-    networks:
-      default:
-        aliases:
-          - ollama.local
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-    pull_policy: always # pull the latest image from the registry
-    tty: true # enable TTY for interactive mode
+  # ollama:
+  #   container_name: ollama
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ${OLLAMA_DATA_DIR:-./ollama_data}:/root/.ollama
+  #   networks:
+  #     default:
+  #       aliases:
+  #         - ollama.local
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 60s
+  #   restart: unless-stopped
+  #   pull_policy: always # pull the latest image from the registry
+  #   tty: true # enable TTY for interactive mode
     
     #* GPU resources for ollama (uncomment if you have a GPU)
     deploy:
@@ -242,6 +243,25 @@ services:
   #     default:
   #       aliases:
   #         - ollama_webui.local
+
+  # Service 12: Mailpit
+  mailpit:
+    container_name: mailpit
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      default:
+        aliases:
+          - mailpit.local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8025/livez"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   mongo_data:

@@ -83,7 +83,8 @@ public class UserController {
     @GetMapping("/users/me")
     public ResponseEntity<UserResponse> getCurrentUser(Authentication auth) {
         User user = userService.getUserByEmail((String) auth.getPrincipal());
-        UserResponse userResponse = new UserResponse(user.getName(), user.getEmail());
+        boolean isVerified = Boolean.TRUE.equals(user.isVerified());
+        UserResponse userResponse = new UserResponse(user.getName(), user.getEmail(), isVerified);
         return ResponseEntity.ok(userResponse);
     }
 }
