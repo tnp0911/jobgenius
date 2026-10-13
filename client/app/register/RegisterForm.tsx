@@ -51,7 +51,7 @@ export function RegisterForm() {
       await handleRegister(registerRequest, { signal: controller.signal });
       if (controllerRef.current !== controller) return;
       const message = await sendEmailVerification(email);
-      toast.success("Registration successful." + (message ? " " + message : ""));
+      toast.success("Registration successful." + (message ? " " + message + "." : ""));
       setTimeout(() => {
         router.push("/login");
       }, 5000);
