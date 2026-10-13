@@ -64,6 +64,7 @@ public class UserService {
                     newUser.setName(oidcUser.getFullName());
                     newUser.setPassword("OAUTH2_USER");
                     newUser.setProvider("GOOGLE");
+                    newUser.setVerified(true);
                     return userRepository.save(newUser);
                 });
     }

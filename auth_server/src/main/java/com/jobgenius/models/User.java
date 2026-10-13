@@ -42,6 +42,9 @@ public class User {
     @Column(nullable = false)
     private boolean fastAPISync = false;
 
+    @Column(nullable = true) // nullable temporarily
+    private Boolean verified = false;
+
     // Getters and Setters
     public Long getUid() {
         return uid;
@@ -98,5 +101,9 @@ public class User {
     public void setFastAPISync(boolean isFastAPISync) {
         this.fastAPISync = isFastAPISync;
     }
+
+    public Boolean isVerified() { return verified; }
+
+    public void setVerified(Boolean verified) { this.verified = verified; }
 
 }
