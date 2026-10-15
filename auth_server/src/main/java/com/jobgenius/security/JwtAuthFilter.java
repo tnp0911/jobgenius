@@ -21,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
@@ -29,11 +30,29 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtservice;
     private final RedisService redisService;
 
+    /** Public /auth paths that must not require (or parse) an access token. */
+    private static final Set<String> PUBLIC_AUTH_PATHS = Set.of(
+            "/auth/login",
+            "/auth/logout",
+            "/auth/refresh",
+            "/auth/login-gauth",
+            "/auth/register",
+            "/auth/forgot-password",
+            "/auth/verify-email",
+            "/auth/send-verification-email",
+            "/auth/resend-verification-email",
+            "/auth/oauth2/failure"
+    );
+
+    private boolean isPublicAuthPath(String path) {
+        return PUBLIC_AUTH_PATHS.contains(path) || path.startsWith("/auth/oauth2/");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String path = request.getServletPath();
-        if (path.startsWith("/auth/")) { // Skip authentication for /auth/** endpoints
+        if (path.startsWith("/auth/") && isPublicAuthPath(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -46,7 +65,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String token = null;
 
-        // 🍪 Extract JWT from cookies
+        // Extract JWT from cookies
         if (request.getCookies() != null) {
             for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
                 if ("access_token".equals(cookie.getName())) {
@@ -56,7 +75,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
 
-        // No token → continue filter chain
+        // No token → continue filter chain (method security / authorizeHttpRequests decide)
         if (token == null) {
             filterChain.doFilter(request, response);
             return;
@@ -75,7 +94,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 authenticationToken.setDetails(details);
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             }
-        } 
+        }
         catch (ExpiredJwtException e) {
             logger.warn("JWT token has expired: {}", e.getMessage());
             response.setStatus(401);

@@ -1,9 +1,11 @@
 package com.jobgenius.services;
 
 import com.jobgenius.dto.FastAPICreateRequest;
+import com.jobgenius.models.GAuthSecretKey;
 import com.jobgenius.models.JGPaymentProviderCustomerId;
 import com.jobgenius.models.PaymentProviderCusIdCompositeKey;
 import com.jobgenius.models.User;
+import com.jobgenius.repositories.GAuthSecretKeyRepository;
 import com.jobgenius.repositories.JGPaymentProviderCustomerIdRepository;
 import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.utils.FastAPIUpdates;
@@ -30,6 +32,7 @@ public class UserService {
     private final FastAPIUpdates fastAPIUpdates;
     private final PasswordEncoder passwordEncoder;
     private final JGPaymentProviderCustomerIdRepository jgPaymentProviderCustomerIdRepository;
+    private final GAuthSecretKeyRepository gAuthSecretKeyRepository;
     private final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     public List<User> getAllUsers() {
@@ -42,6 +45,11 @@ public class UserService {
 
     public User getUserById(Long id) {
         return userRepository.findById(id).orElse(null);
+    }
+
+    public Boolean getUserMFAStatus(Long uid){
+        GAuthSecretKey gAuthSecretKey = gAuthSecretKeyRepository.findByUser_Uid(uid).orElse(null);
+        return gAuthSecretKey != null && gAuthSecretKey.isActivated();
     }
 
     @Transactional

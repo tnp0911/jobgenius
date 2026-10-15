@@ -1,7 +1,9 @@
 package com.jobgenius.config;
 
+import com.jobgenius.models.GAuthSecretKey;
 import com.jobgenius.models.RefreshToken;
 import com.jobgenius.models.User;
+import com.jobgenius.repositories.GAuthSecretKeyRepository;
 import com.jobgenius.repositories.RefreshTokenRepository;
 import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.security.APIKeyFilter;
@@ -47,6 +49,7 @@ public class SecurityConfig {
     private final UserService userService;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final GAuthSecretKeyRepository gAuthSecretKeyRepository;
     private final JwtService jwtService;
     private final APIKeyFilter apiKeyFilter;
     private final TokenHelper tokenHelper;
@@ -70,7 +73,14 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Allow unauthenticated access to auth endpoints and Stripe webhook
+                        // MFA management + password update require a valid session
+                        .requestMatchers(
+                                "/auth/register-gauth",
+                                "/auth/verify-gauth-for-registration",
+                                "/auth/disable-gauth",
+                                "/auth/update-password"
+                        ).authenticated()
+                        // Allow unauthenticated access to remaining auth endpoints and Stripe webhook
                         .requestMatchers(
                                 "/auth/**",
                                 "/api/stripe/webhook",
@@ -88,6 +98,23 @@ public class SecurityConfig {
                                                 new RuntimeException("User not found"));
                                 logger.info("OAuth2 login successful for user: {}",
                                         user.getEmail());
+
+
+                                GAuthSecretKey gaKey = gAuthSecretKeyRepository.findByUser_Uid(user.getUid()).orElse(null);
+                                if (gaKey != null && gaKey.isActivated()) {
+                                    String mfaChallenge = jwtService.generate2FAChallengeToken(user);
+                                    ResponseCookie mfaCookie = ResponseCookie
+                                            .from("mfa_required_token", mfaChallenge)
+                                            .httpOnly(true)
+                                            .secure(true)
+                                            .path("/auth/login-gauth")
+                                            .sameSite("None")
+                                            .maxAge(5 * 60)
+                                            .build();
+                                    res.addHeader(HttpHeaders.SET_COOKIE, mfaCookie.toString());
+                                    res.sendRedirect(frontendUrl + "/mfa");
+                                    return;
+                                }
 
                                 // Generate access token
                                 String accessToken = jwtService.generateAccessToken(user);
@@ -119,7 +146,7 @@ public class SecurityConfig {
                                         .from("refresh_token", Objects.requireNonNull(refreshTokenValue))
                                         .httpOnly(true)
                                         .secure(true)
-                                        .path("/auth/refresh") // Meaning: only send this cookie when the request is made to /auth/refresh endpoint
+                                        .path("/auth/refresh")
                                         .sameSite("None")
                                         .maxAge(7 * 24 * 60 * 60) // 7 days
                                         .build();
@@ -145,9 +172,7 @@ public class SecurityConfig {
                         
                                 res.sendRedirect(frontendUrl); 
                                 })
-                                .failureUrl("http://localhost:3000/error") // Redirect after failed
-                        // OAuth2 login, change this
-                        // to client URL
+                                .failureUrl("http://localhost:3000/error")
                 )
                 .addFilterBefore(apiLoggingFilter, UsernamePasswordAuthenticationFilter.class)
                 // UsernamePasswordAuthenticationFilter is the filter implemented by Spring Security to handle username/password authentication.

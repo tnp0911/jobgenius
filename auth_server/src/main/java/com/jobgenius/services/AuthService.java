@@ -3,8 +3,10 @@ package com.jobgenius.services;
 import com.jobgenius.dto.FastAPICreateRequest;
 import com.jobgenius.dto.LoginRequest;
 import com.jobgenius.dto.RegisterRequest;
+import com.jobgenius.models.GAuthSecretKey;
 import com.jobgenius.models.RefreshToken;
 import com.jobgenius.models.User;
+import com.jobgenius.repositories.GAuthSecretKeyRepository;
 import com.jobgenius.repositories.RefreshTokenRepository;
 import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.utils.TokenHelper;
@@ -16,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +33,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final RedisService redisService;
     private final WebClient webClient;
+    private final GAuthSecretKeyRepository gAuthSecretKeyRepository;
     private final Logger logger = LoggerFactory.getLogger(AuthService.class);
     private final TokenHelper tokenHelper;
 
@@ -83,26 +85,14 @@ public class AuthService {
             if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
                 throw new RuntimeException("Invalid password");
             }
-            // Generate access token
-            String accessToken = jwtService.generateAccessToken(user);
 
-            tokenHelper.refreshTokenList(user);
-
-            String refreshTokenStr = jwtService.generateRefreshToken(user);
-            // Generate refresh token
-            RefreshToken refreshToken = new RefreshToken();
-            refreshToken.setRefreshToken(refreshTokenStr);
-            refreshToken.setUser(user);
-            refreshToken.setRevoked(false);
-            refreshToken.setCreatedAt(new Date());
-            refreshToken.setExpiryDate(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)); // 7 days
-            refreshToken.setSessionStartAt(new Date());
-            refreshTokenRepository.save(refreshToken);
-
-            Map<String, String> tokens = Map.of(
-                    "accessToken", accessToken,
-                    "refreshToken", refreshTokenStr);
-            return tokens;
+            GAuthSecretKey gaKey = gAuthSecretKeyRepository.findByUser_Uid(user.getUid()).orElse(null);
+            if (gaKey != null && gaKey.isActivated()) {
+                return Map.of(
+                        "mfaRequiredToken", jwtService.generate2FAChallengeToken(user)
+                );
+            }
+            return jwtService.generateTokensAfterAuthentication(user);
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage());
         }

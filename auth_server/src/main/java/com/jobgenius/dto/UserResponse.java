@@ -9,4 +9,5 @@ public class UserResponse {
     private String name;
     private String email;
     private boolean emailVerified;
+    private boolean mfaEnabled;
 }
