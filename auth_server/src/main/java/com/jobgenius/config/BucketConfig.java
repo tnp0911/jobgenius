@@ -41,8 +41,8 @@ public class BucketConfig {
         public Supplier<BucketConfiguration> bucketConfigurationSupplier() {
                 return () -> BucketConfiguration.builder()
                                 .addLimit(Bandwidth.classic(
-                                                5,
-                                                Refill.intervally(5, Duration.ofMinutes(1))))
+                                                20,
+                                                Refill.greedy(20, Duration.ofMinutes(1))))
                                 .build();
         }
 }

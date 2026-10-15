@@ -1,41 +1,73 @@
 package com.jobgenius.services;
 
-import java.nio.charset.StandardCharsets;
-import java.security.Key;
-import java.util.Date;
-import java.util.Map;
-
 import com.jobgenius.models.RefreshToken;
+import com.jobgenius.models.User;
 import com.jobgenius.repositories.RefreshTokenRepository;
+import com.jobgenius.utils.TokenHelper;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import com.jobgenius.models.User;
-
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import jakarta.transaction.Transactional;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.util.Date;
+import java.util.Map;
 
 @Service
 public class JwtService {
+    public static final String MFA_CHALLENGE_PURPOSE = "mfa_challenge";
+
     @Value("${jwt.secret}")
     private final String SECRET_KEY = System.getenv("JWT_SECRET_KEY");
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final TokenHelper tokenHelper;
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(JwtService.class);
 
-    public JwtService(RefreshTokenRepository refreshTokenRepository) {
+    public JwtService(RefreshTokenRepository refreshTokenRepository, TokenHelper tokenHelper) {
         this.refreshTokenRepository = refreshTokenRepository;
         if (SECRET_KEY == null || SECRET_KEY.isEmpty()) {
             throw new IllegalStateException("JWT_SECRET_KEY environment variable is not set");
         }
+        this.tokenHelper = tokenHelper;
     }
 
     private Key getKey() {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public String generate2FAChallengeToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .claim("user_id", user.getUid())
+                .claim("purpose", MFA_CHALLENGE_PURPOSE)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 5)) // 5 minutes
+                .signWith(getKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * Returns true only for a valid, unexpired MFA challenge token (not access/refresh JWTs).
+     */
+    public boolean validate2FAChallengeToken(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(getKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            return MFA_CHALLENGE_PURPOSE.equals(claims.get("purpose", String.class));
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 
     public String generateAccessToken(User user) {
@@ -45,6 +77,15 @@ public class JwtService {
                 .claim("user_id", user.getUid()) // Include uid in the payload
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 15)) // 15 minutes
+                .signWith(getKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String generateRefreshToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24 * 7)) // 7 days
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -93,15 +134,6 @@ public class JwtService {
         return true;
     }
 
-    public String generateRefreshToken(User user) {
-        return Jwts.builder()
-                .setSubject(user.getEmail())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24 * 7)) // 7 days
-                .signWith(getKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
     @Transactional // For atomicity, ensure that the refresh token is revoked and the new token is generated in a single transaction
     public Map<String, String> refreshAccessToken(String refreshToken, User user) {
         RefreshToken token = refreshTokenRepository.findByRefreshToken(refreshToken)
@@ -136,6 +168,33 @@ public class JwtService {
         refreshTokenRepository.save(newToken);
 
         return Map.of("access_token", newAccessToken, "refresh_token", newRefreshTokenStr);
+    }
+
+    public Map<String, String> generateTokensAfterAuthentication(User user) {
+        try {
+            // Generate access token
+            String accessToken = generateAccessToken(user);
+            tokenHelper.refreshTokenList(user);
+            String refreshTokenStr = generateRefreshToken(user);
+
+            // Generate refresh token
+            RefreshToken refreshToken = new RefreshToken();
+            refreshToken.setRefreshToken(refreshTokenStr);
+            refreshToken.setUser(user);
+            refreshToken.setRevoked(false);
+            refreshToken.setCreatedAt(new Date());
+            refreshToken.setExpiryDate(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)); // 7 days
+            refreshToken.setSessionStartAt(new Date());
+            refreshTokenRepository.save(refreshToken);
+
+            return Map.of(
+                    "accessToken", accessToken,
+                    "refreshToken", refreshTokenStr
+            );
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+        }
     }
 
     @Transactional
