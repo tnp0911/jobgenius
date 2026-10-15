@@ -58,9 +58,17 @@ export function LoginForm() {
         password,
       };
 
-      await handleLogin(loginRequest, { signal: controller.signal });
+      const loginResult = await handleLogin(loginRequest, {
+        signal: controller.signal,
+      });
 
       if (controllerRef.current !== controller) return;
+
+      if (loginResult.mfaRequired) {
+        toast.info("Enter your Google Authenticator code to finish signing in.");
+        router.push("/mfa");
+        return;
+      }
 
       const next = await refreshAuth();
       // Only nudge unverified accounts; verified users go straight in.
