@@ -32,6 +32,18 @@ public class LoginController {
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
         try {
             Map<String, String> tokens = authService.login(loginRequest);
+            String mfaRequiredToken = tokens.get("mfaRequiredToken");
+            if (mfaRequiredToken != null) {
+                ResponseCookie cookie = ResponseCookie.from("mfa_required_token", mfaRequiredToken)
+                        .httpOnly(true)
+                        .secure(true)
+                        .path("/auth/login-gauth")
+                        .sameSite("None") // REQUIRED for React cross-origin
+                        .maxAge(5 * 60) // 5 minutes
+                        .build();
+                response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body("Please complete MFA verification.");
+            }
             String accessToken = tokens.get("accessToken");
             String refreshToken = tokens.get("refreshToken");
             ResponseCookie cookie = ResponseCookie.from("access_token", Objects.requireNonNull(accessToken))

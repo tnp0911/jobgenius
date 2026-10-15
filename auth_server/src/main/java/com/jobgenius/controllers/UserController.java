@@ -84,7 +84,8 @@ public class UserController {
     public ResponseEntity<UserResponse> getCurrentUser(Authentication auth) {
         User user = userService.getUserByEmail((String) auth.getPrincipal());
         boolean isVerified = Boolean.TRUE.equals(user.isVerified());
-        UserResponse userResponse = new UserResponse(user.getName(), user.getEmail(), isVerified);
+        Boolean mfaStatus = userService.getUserMFAStatus(user.getUid());
+        UserResponse userResponse = new UserResponse(user.getName(), user.getEmail(), isVerified, mfaStatus);
         return ResponseEntity.ok(userResponse);
     }
 }
