@@ -1,0 +1,42 @@
+name: FastAPI CI Pipeline
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "api_server/**"
+      - ".github/workflows/fastapi-ci.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "api_server/**"
+      - ".github/workflows/fastapi-ci.yml"
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: test
+      JWT_SECRET_KEY: test-secret
+      SQL_DB_URL: sqlite:///./test.db
+      RAPIDAPI_KEY: test
+    defaults:
+      run:
+        working-directory: api_server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11.5"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run unit tests
+        run: uv run pytest -v app/tests/unit
