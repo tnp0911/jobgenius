@@ -35,3 +35,15 @@ export type ForgotPasswordResponse = {
     error?: string;
     message?: string;
 };
+
+export type MfaCodeRequest = {
+    code: number;
+};
+
+export type RegisterGauthResponse = {
+    qrCodeUrl: string;
+};
+
+export type LoginResult = {
+    mfaRequired: boolean;
+};

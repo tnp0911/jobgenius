@@ -21,7 +21,7 @@ mcp = FastMCP("job_service")
     Search jobs through the third-party API (JSearch API)
     Parameters:
         query: The query to search for jobs
-        country: The country to search for jobs (if given) - Default values: ca
+        country: 2-letter country code for the job search. Default: ca. Override from resume / user location when available (e.g. us, gb, au, in) — do not always leave it as ca
         language: The language to search for jobs (if given) - Default values: en
         date_posted: Date posted (if given) - Default values: all, today, 3days, week, month
         employment_types (optional): Employment types (if given) - Default values: FULLTIME, CONTRACTOR, PARTTIME, INTERN

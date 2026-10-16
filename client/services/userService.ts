@@ -24,6 +24,7 @@ export type CurrentUser = {
     name: string;
     email: string;
     emailVerified: boolean;
+    mfaEnabled?: boolean;
 };
 
 export async function getCurrentUser(

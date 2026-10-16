@@ -1,5 +1,16 @@
 import axios from "axios";
-import { AuthOptions, ForgotPasswordRequest, ForgotPasswordResponse, LoginRequest, RegisterRequest, UpdatePasswordRequest, UpdatePasswordResponse } from "./types";
+import {
+    AuthOptions,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    LoginResult,
+    MfaCodeRequest,
+    RegisterGauthResponse,
+    RegisterRequest,
+    UpdatePasswordRequest,
+    UpdatePasswordResponse,
+} from "./types";
 import { isAborted } from "@/utils/errorHelpers";
 
 export const authConfig = (options?: AuthOptions) => ({
@@ -9,6 +20,29 @@ export const authConfig = (options?: AuthOptions) => ({
     headers: options?.headers ?? {},
 });
 
+function extractAuthErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+        const data = error.response?.data;
+        if (typeof data === "string" && data.trim()) {
+            return data;
+        }
+        if (data && typeof data === "object") {
+            const body = data as { message?: string; error?: string };
+            if (typeof body.message === "string" && body.message.trim()) {
+                return body.message;
+            }
+            if (typeof body.error === "string" && body.error.trim()) {
+                return body.error;
+            }
+        }
+        return error.message;
+    }
+    if (error instanceof Error) {
+        return error.message;
+    }
+    return "An unknown error occurred.";
+}
+
 function rethrowAuthError(error: unknown): never {
     if (isAborted(error)) {
         throw error;
@@ -16,13 +50,7 @@ function rethrowAuthError(error: unknown): never {
     if (axios.isAxiosError(error) && error.response?.status === 429) {
         throw new Error("Too many requests. Please try again later.");
     }
-    if (axios.isAxiosError(error)) {
-        throw new Error(error.response?.data?.message || error.message);
-    }
-    if (error instanceof Error) {
-        throw new Error(error.message);
-    }
-    throw new Error("An unknown error occurred.");
+    throw new Error(extractAuthErrorMessage(error));
 }
 
 export async function handleAnonymousReady(): Promise<void> {
@@ -40,13 +68,14 @@ export async function handleAnonymousReady(): Promise<void> {
 export async function handleLogin(
     loginRequest: LoginRequest,
     options?: AuthOptions,
-): Promise<void> {
+): Promise<LoginResult> {
     try {
-        await axios.post(
+        const response = await axios.post(
             `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/login`,
             loginRequest,
             authConfig(options),
         );
+        return { mfaRequired: response.status === 202 };
     }
     catch (error: unknown) {
         rethrowAuthError(error);
@@ -113,6 +142,68 @@ export async function handleForgotPassword(forgotPasswordRequest: ForgotPassword
         return response.data;
     }
     catch (error: unknown) {
+        rethrowAuthError(error);
+    }
+}
+
+export async function handleRegisterGauth(
+    options?: AuthOptions,
+): Promise<RegisterGauthResponse> {
+    try {
+        const response = await axios.post<RegisterGauthResponse>(
+            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/register-gauth`,
+            {},
+            authConfig({ ...options, timeout: options?.timeout ?? 10000 }),
+        );
+        return response.data;
+    } catch (error: unknown) {
+        rethrowAuthError(error);
+    }
+}
+
+export async function handleVerifyGauthRegistration(
+    request: MfaCodeRequest,
+    options?: AuthOptions,
+): Promise<void> {
+    try {
+        await axios.post(
+            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/verify-gauth-for-registration`,
+            request,
+            authConfig(options),
+        );
+    } catch (error: unknown) {
+        rethrowAuthError(error);
+    }
+}
+
+export async function handleLoginGauth(
+    request: MfaCodeRequest,
+    options?: AuthOptions,
+): Promise<void> {
+    try {
+        await axios.post(
+            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/login-gauth`,
+            request,
+            authConfig(options),
+        );
+    } catch (error: unknown) {
+        rethrowAuthError(error);
+    }
+}
+
+export async function handleDisableGauth(
+    request: MfaCodeRequest,
+    options?: AuthOptions,
+): Promise<void> {
+    try {
+        await axios.delete(
+            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/disable-gauth`,
+            {
+                ...authConfig(options),
+                data: request,
+            },
+        );
+    } catch (error: unknown) {
         rethrowAuthError(error);
     }
 }
