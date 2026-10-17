@@ -41,20 +41,20 @@ jobs:
       - name: Run unit tests
         run: uv run pytest -v app/tests/unit
 
-    docker-build-test:
-      needs: unit-tests
-      runs-on: ubuntu-latest
-      env:
-        API_KEY: test
-        JWT_SECRET_KEY: test-secret
-        SQL_DB_URL: sqlite:///./test.db
-        RAPIDAPI_KEY: test
-      defaults:
-        run:
-          working-directory: api_server
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
+  docker-build-test:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: test
+      JWT_SECRET_KEY: test-secret
+      SQL_DB_URL: sqlite:///./test.db
+      RAPIDAPI_KEY: test
+    defaults:
+      run:
+        working-directory: api_server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-        - name: Run Docker build test
-          run: docker build -t api_server .
+      - name: Run Docker build test
+        run: docker build -t api_server .
