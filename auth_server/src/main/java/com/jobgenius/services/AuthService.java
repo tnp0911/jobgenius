@@ -83,7 +83,7 @@ public class AuthService {
                 throw new RuntimeException("Error occurred during login. Please try again.");
             }
             if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-                throw new RuntimeException("Invalid password");
+                throw new RuntimeException("Invalid email or password");
             }
 
             GAuthSecretKey gaKey = gAuthSecretKeyRepository.findByUser_Uid(user.getUid()).orElse(null);

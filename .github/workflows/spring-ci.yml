@@ -1,0 +1,48 @@
+name: Spring CI Pipeline
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "auth_server/**"
+      - ".github/workflows/spring-ci.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "auth_server/**"
+      - ".github/workflows/spring-ci.yml"
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET_KEY: test-jwt-secret-key-at-least-32-bytes!
+    defaults:
+      run:
+        working-directory: auth_server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Run unit tests
+        run: chmod +x mvnw && ./mvnw -B test
+
+  docker-build-test:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth_server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Docker build test
+        run: docker build -t auth_server .
