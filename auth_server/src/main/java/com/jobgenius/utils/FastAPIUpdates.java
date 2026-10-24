@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Component
@@ -16,13 +17,16 @@ public class FastAPIUpdates {
 
     public void updatePlanFastAPI(String userId, String newPlan, String newPlanExpiry) {
         try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("new_plan", newPlan);
+            if (newPlanExpiry != null && !newPlanExpiry.isBlank()) {
+                body.put("plan_expiry", newPlanExpiry);
+            }
             webClient.put()
                     .uri(uriBuilder -> uriBuilder
                             .path("/internal/users/{user_id}/plan/update")
                             .build(userId))
-                    .bodyValue(
-                            Map.of("new_plan", newPlan,
-                                    "plan_expiry", newPlanExpiry))
+                    .bodyValue(body)
                     .retrieve()
                     .bodyToMono(Void.class)
                     .block();
