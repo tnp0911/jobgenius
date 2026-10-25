@@ -2,11 +2,12 @@ import json
 import logging
 
 from app.core.config import settings
-from app.db.mcp import get_mcp_client_tools
+from app.db.mcp import get_mcp_job_tools
 from app.helpers.job_indexing import index_jobs_in_background
 from langchain.agents import create_agent
 from langchain_core.messages import ToolMessage
 from langchain_ollama import ChatOllama
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -16,73 +17,25 @@ async def jobfinder_agent(
     analyzed_results_dict: dict | None = None,
     user_requirements: str = "",
 ):
-    mcp_client_tools = await get_mcp_client_tools()
+    if not resume_text or not resume_text.strip():
+        raise ValueError("resume_text must not be empty")
+    mcp_job_tools = await get_mcp_job_tools()
+    instructions_path = (
+        Path(__file__).parent.parent / "instructions" / "agent7_instructions.md"
+    )
+    system_prompt = instructions_path.read_text(encoding="utf-8")
 
     model = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_HOST,
     )
 
-    agent = create_agent(model=model, tools=mcp_client_tools)
+    agent = create_agent(model=model, tools=mcp_job_tools)
 
     messages = [
         {
             "role": "system",
-            "content": """
-                You are a job finder agent. You are provided with an original resume text.
-                An analyzed results dictionary from previous agents or user requirements are optional.
-                Your task is to find the best jobs for the user based on the original resume text and the analyzed results dictionary or user requirements.
-                You are also provided with a tool to search for jobs.
-                Self-analyze the input to build the best search_jobs call for the user.
-
-                Allowed actions:
-                - Call the search_jobs tool
-                - Briefly explain why returned jobs fit
-
-                When calling search_jobs:
-                - query MUST look like: "{role} in {city}, {country}"
-                  Prefer target_role from intent (analyzed results) when present; otherwise infer from resume / user_requirements.
-                  For Intern/Junior/fresher, include that level in the query (e.g. "junior software engineer in Toronto, Canada").
-                - Infer city/country from resume or user_requirements (e.g. Windsor, Toronto, Canada)
-                - country defaults to "ca" only when no location is found; otherwise set it from the resume /
-                  user_requirements / analyzed results (2-letter code: ca, us, gb, au, in, etc.). Change it
-                  flexibly — do not hardcode Canada when the candidate is clearly elsewhere
-                - Prefer 1-2 focused searches over vague role-only queries
-                - Avoid country-only queries like "software engineer Canada"
-
-                REQUIRED — seniority / experience filters (do NOT omit when known):
-                Read intent.seniority_level and analyzer.years_exp from analyzed results when present.
-                If there is no analyzed dict, infer the same signals from user_requirements and the resume.
-                Always pass job_requirements (and employment_types when Intern) when seniority or experience is known.
-
-                Allowed job_requirements values (comma-separated list to the tool):
-                  no_experience | under_3_years_experience | more_than_3_years_experience | no_degree
-                Allowed employment_types values:
-                  FULLTIME | CONTRACTOR | PARTTIME | INTERN
-
-                Mapping rules (case-insensitive; treat fresher / entry-level / new grad like Intern/Junior):
-                - Intern OR fresher OR years_exp is 0 OR no prior experience
-                    → job_requirements: ["no_experience"]
-                    → employment_types: ["INTERN"] (add PARTTIME only if user asks for part-time)
-                - Junior OR under ~3 years (years_exp < 3)
-                    → job_requirements: ["under_3_years_experience"]
-                    → do NOT set employment_types to INTERN unless seniority is Intern
-                - Mid OR years_exp between 3 and ~5
-                    → job_requirements: ["under_3_years_experience", "more_than_3_years_experience"] if years_exp is near 3;
-                      otherwise ["more_than_3_years_experience"] when years_exp >= 3, else ["under_3_years_experience"]
-                - Senior OR years_exp > 5
-                    → job_requirements: ["more_than_3_years_experience"]
-                - If user_requirements explicitly ask for no degree, include "no_degree" in job_requirements
-                - If seniority_level / years_exp / clear experience wording is present, you MUST set job_requirements.
-                  Never leave job_requirements empty in that case.
-
-                Forbidden actions:
-                - Do NOT rewrite the resume
-                - Do NOT optimize, improve, or reformat the resume
-                - Do NOT invent jobs without calling search_jobs
-                - Do NOT ignore seniority_level / years_exp when calling search_jobs
-                You must return the jobs with a beautiful and concise description of the job for next steps.
-            """,
+            "content": system_prompt,
         }
     ]
 

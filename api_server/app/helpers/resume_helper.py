@@ -8,6 +8,8 @@ from app.internal_db.spoken_languages import SPOKEN_LANGUAGES, PROFICIENCY_LEVEL
 def normalize_text(text: str) -> str:
     return " ".join(text.lower().split())
 
+def clean_text(text: str) -> str:
+    pass
 
 def match_variants(text: str, variants: List[str]) -> bool:
     for variant in variants:
@@ -131,11 +133,11 @@ def format_analyzer_result(result: dict) -> dict:
         ats_score=_as_float(ats["ats_score"]) if ats.get("ats_score") is not None else None,
         hard_skills_score=_as_float(ats["hard_skills_score"]) if ats.get("hard_skills_score") is not None else None,
         soft_skills_score=_as_float(ats["soft_skills_score"]) if ats.get("soft_skills_score") is not None else None,
-        optimized_resume=str(optimizer.get("optimized_resume") or ""),
-        optimized_sections=_as_dict(optimizer.get("optimized_sections")),
+        section_order=_as_list(optimizer.get("section_order")),
+        optimized_sections=_as_dict(optimizer.get("optimized_sections")) or None,
         keywords_integrated=_as_list(optimizer.get("keywords_integrated")),
-        changes_made=_as_list(optimizer.get("changes_made")),
-        suggested_additions_if_true=_as_list(optimizer.get("suggested_additions_if_true")),
+        changes_made=_as_list(optimizer.get("changes_made") or []),
+        suggested_additions_if_true=_as_list(optimizer.get("suggested_additions_if_true") or []),
         optimization_notes=str(optimizer.get("optimization_notes") or ""),
         summary=str(feedback.get("summary") or ""),
         skills_feedback=str(feedback.get("skills_feedback") or ""),
@@ -158,14 +160,14 @@ def format_analyzer_result(result: dict) -> dict:
     return analysis.model_dump(mode="json")
 
 
-def analyzer_result_to_text(result: dict) -> str:
+def analyzer_result_to_text(resume_text: str, result: dict) -> str:
     """
     Convert the result of the multi-agents to a single meaningful text for job recommendation
     """
     intent = _as_dict(result.get("intent"))
     analyzer = _as_dict(result.get("analyzer"))
     feedback = _as_dict(result.get("feedback") or result.get("finalizer"))
-    optimizer = _as_dict(result.get("optimizer"))
+    resume_text = resume_text.strip()
 
     hard_skills = ", ".join(_as_list(analyzer.get("hard_skills")))
     soft_skills = ", ".join(_as_list(analyzer.get("soft_skills")))
@@ -189,7 +191,7 @@ def analyzer_result_to_text(result: dict) -> str:
         feedback.get("jd_fit_analysis"),
         feedback.get("competitive_positioning"),
         feedback.get("optimizer_review"),
-        optimizer.get("optimized_resume"),
+        resume_text,
     ]
 
     return "\n".join(part.strip() for part in parts if isinstance(part, str) and part.strip())

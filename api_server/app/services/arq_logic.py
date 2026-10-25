@@ -71,6 +71,7 @@ async def analyze_resume_premium(
             "store_resume_to_mongodb_arq",
             user_id,
             resume_filename,
+            resume_text,
             resume_bytes,
             result,
         )

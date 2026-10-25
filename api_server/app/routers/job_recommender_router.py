@@ -11,7 +11,7 @@ from app.helpers.job_indexing import schedule_job_indexing
 from app.helpers.llm_call import agent7_jobfinder_format_result
 from app.helpers.user_helper import get_user_city_and_country, get_user_ip_address
 from app.schemas.user import UserResponse
-from app.services.job_service import job_recommendation_with_pinecone, search_jobs
+from app.services.job_service import job_recommendation_with_pinecone, search_jobs_with_jsearch
 from app.services.resume_service import (
     get_resume_for_job_recommendation_from_mongodb,
     resolve_resume_id_for_recommendations,
@@ -67,13 +67,13 @@ async def get_job_recommendations_unlogged_in_user(request: Request):
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
-                    "provider": "search_jobs",
+                    "provider": "search_jobs_with_jsearch",
                     "jobs": json.loads(recommendations),
                 },
             )
 
         query = f"any job in {city}, {country}"
-        jobs = await search_jobs(query, country=country_code, language="en")
+        jobs = await search_jobs_with_jsearch(query, country=country_code, language="en")
         if not jobs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
@@ -91,7 +91,7 @@ async def get_job_recommendations_unlogged_in_user(request: Request):
             )
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"provider": "search_jobs", "jobs": jobs},
+            content={"provider": "search_jobs_with_jsearch", "jobs": jobs},
         )
     except HTTPException:
         raise
@@ -175,7 +175,7 @@ async def get_job_recommendations_free_user(
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
-                    "provider": "search_jobs",
+                    "provider": "search_jobs_with_jsearch",
                     "jobs": json.loads(recommendations),
                 },
             )
@@ -184,7 +184,7 @@ async def get_job_recommendations_free_user(
             query = f"{target_role.strip()} in {city}, {country}"
         else:
             query = f"{target_role.strip()} at {seniority_level.strip()} level in {city}, {country}"
-        jobs = await search_jobs(query, country=country_code, language="en")
+        jobs = await search_jobs_with_jsearch(query, country=country_code, language="en")
         if not jobs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
@@ -203,7 +203,7 @@ async def get_job_recommendations_free_user(
         schedule_job_indexing(jobs)
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"provider": "search_jobs", "jobs": jobs},
+            content={"provider": "search_jobs_with_jsearch", "jobs": jobs},
         )
     except HTTPException:
         raise

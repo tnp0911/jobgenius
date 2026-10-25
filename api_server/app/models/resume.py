@@ -5,6 +5,7 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
 
 class ResumeAnalysis(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     # Analysis of the resume
     # Intent agent
     target_role: str
@@ -36,12 +37,12 @@ class ResumeAnalysis(BaseModel):
     hard_skills_score: Optional[float]
     soft_skills_score: Optional[float]
     # Optimizer agent
-    optimized_resume: str
-    optimized_sections: dict
-    keywords_integrated: List[str]
-    changes_made: List[str]
-    suggested_additions_if_true: List[str]
-    optimization_notes: str
+    section_order: List[str] = Field(default_factory=list)
+    optimized_sections: Optional[dict] = None
+    keywords_integrated: List[str] = Field(default_factory=list)
+    changes_made: List[str] = Field(default_factory=list)
+    suggested_additions_if_true: List[str] = Field(default_factory=list)
+    optimization_notes: str = ""
     # Finalizer agent
     summary: str
     skills_feedback: str

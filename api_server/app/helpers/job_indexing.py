@@ -31,8 +31,7 @@ def schedule_job_indexing(jobs: list) -> None:
     """
     Fire-and-forget indexing so HTTP handlers can return jobs immediately.
 
-    A client disconnect must not fail the recommendation response after search_jobs
-    has already succeeded.
+    A client disconnect must not fail the recommendation response after search_jobs_with_jsearch has already succeeded.
     """
     if not jobs:
         return

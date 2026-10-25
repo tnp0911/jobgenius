@@ -1,10 +1,15 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any, Optional
 
 from app.helpers.llm_call import llm_call, safe_parse
 
 logger = logging.getLogger(__name__)
+
+_INSTRUCTIONS_PATH = (
+    Path(__file__).parent.parent / "instructions" / "agent6_instructions.md"
+)
 
 
 def _pct(value: Any) -> float:
@@ -20,6 +25,27 @@ def _pct(value: Any) -> float:
 
 def _json_block(data: Any) -> str:
     return json.dumps(data, indent=2, default=str, ensure_ascii=False)
+
+
+def _load_template(tier: str) -> str:
+    raw = _INSTRUCTIONS_PATH.read_text(encoding="utf-8")
+    start = f"<!-- AGENT6_TEMPLATE {tier} -->"
+    end = "<!-- /AGENT6_TEMPLATE -->"
+    start_idx = raw.find(start)
+    if start_idx < 0:
+        raise ValueError(f"Agent 6 instructions missing template: {tier}")
+    body = raw[start_idx + len(start) :]
+    end_idx = body.find(end)
+    if end_idx < 0:
+        raise ValueError(f"Agent 6 instructions missing end marker for: {tier}")
+    return body[:end_idx].strip()
+
+
+def _fill_template(template: str, mapping: dict[str, str]) -> str:
+    prompt = template
+    for key, value in mapping.items():
+        prompt = prompt.replace("{" + key + "}", value)
+    return prompt
 
 
 async def finalizer_agent_free_tier(
@@ -129,65 +155,23 @@ async def finalizer_agent_free_tier(
             - Formatting Score: {formatting_score}%
             """
 
-    prompt = f"""
-        You are an AI resume reviewer for free-tier users.
-
-        You receive the original resume plus structured outputs from earlier pipeline agents.
-        Produce general, practical feedback only — not deep career counseling.
-
-        === RESUME TEXT ===
-        {resume_text}
-
-        === USER GOAL (raw input) ===
-        {user_goal}
-
-        === AGENT 1 — INTENT & GOALS ===
-        Target role: {target_role}
-        Seniority: {seniority_level}
-        Industry: {industry}
-        Priority goals: {_json_block(priority_goals)}
-        Focus areas: {_json_block(focus_areas)}
-        Top keywords: {_json_block(top_keywords)}
-        Optimization strategy: {_json_block(optimization_strategy)}
-
-        === AGENT 2 — STRUCTURE SIGNALS ===
-        Estimated years of experience: {years_exp}
-        Section presence: {_json_block(section_flags)}
-        {jd_scores_block}
-        === INSTRUCTIONS ===
-        - Free-tier only: keep feedback general; do NOT over-personalize
-        - Use Agent 1 for light direction (role, goals, focus areas, keywords, avoid list)
-        - Use Agent 2 for skills, sections, and JD gaps (only when JD data is present)
-        - Use Agent 3 scores as the main quality signals
-        - Ground every claim in the resume and the structured fields above
-        - Do NOT invent skills, jobs, metrics, or achievements
-        - Do NOT assume more about the candidate than the inputs support
-        - Focus on:
-        1. Overall resume quality (Overall Resume Score)
-        2. Skills section (detected skills; include JD gaps only if JD was provided)
-        3. Experience section (impact/clarity); if no experience section, use projects or other relevant sections
-        4. Structure and readability (section flags + Necessary Sections / Summary / Formatting scores)
-        - Keep suggestions simple, actionable, and few
-        - Align light guidance with priority_goals / focus_areas / avoid when useful
-        - If the resume does not have clear headings for sections, do not say something like "You only have 0 years of experience" (If they actually have experience, they will have a section for it). Instead, say something like "You should add a section for your experience".
-
-        === OUTPUT FORMAT ===
-        Return ONLY valid JSON (no markdown fences):
-        {{
-        "summary": "",
-        "skills_feedback": "",
-        "experience_feedback": "",
-        "structure_feedback": "",
-        "simple_suggestions": []
-        }}
-
-        Rules for fields:
-        - summary: short overall take using the main scores and Agent 1 target role when available
-        - skills_feedback: clarity/completeness of skills; mention gaps only if JD data exists
-        - experience_feedback: impact and clarity of experience/projects
-        - structure_feedback: sections, readability, metrics usage
-        - simple_suggestions: max 5 short, practical bullets
-        """
+    prompt = _fill_template(
+        _load_template("free"),
+        {
+            "resume_text": resume_text,
+            "user_goal": user_goal,
+            "target_role": str(target_role),
+            "seniority_level": str(seniority_level),
+            "industry": str(industry),
+            "priority_goals": _json_block(priority_goals),
+            "focus_areas": _json_block(focus_areas),
+            "top_keywords": _json_block(top_keywords),
+            "optimization_strategy": _json_block(optimization_strategy),
+            "years_exp": str(years_exp),
+            "section_flags": _json_block(section_flags),
+            "jd_scores_block": jd_scores_block,
+        },
+    )
 
     response = await llm_call(prompt)
 
@@ -270,8 +254,8 @@ async def finalizer_agent_premium(
     languages_score = ats.get("languages_score", 0)
     professional_links_score = ats.get("professional_links_score", 0)
 
-    optimized_resume = optimizer.get("optimized_resume", "")
-    optimized_sections = optimizer.get("optimized_sections", {})
+    section_order = optimizer.get("section_order", [])
+    optimized_sections = optimizer.get("optimized_sections", None) or {}
     keywords_integrated = optimizer.get("keywords_integrated", [])
     changes_made = optimizer.get("changes_made", [])
     suggested_additions_if_true = optimizer.get("suggested_additions_if_true", [])
@@ -321,109 +305,30 @@ async def finalizer_agent_premium(
             {score_dashboard}
             """
 
-    jd_fit_instruction = (
-        "- jd_fit_analysis: deep JD alignment — keyword gaps, ATS risk, and how to close gaps using true experience"
-        if has_jd
-        else "- jd_fit_analysis: empty string (no JD provided)"
+    prompt = _fill_template(
+        _load_template("premium"),
+        {
+            "score_dashboard": score_dashboard,
+            "resume_text": resume_text,
+            "user_goal": user_goal,
+            "target_role": str(target_role),
+            "seniority_level": str(seniority_level),
+            "industry": str(industry),
+            "priority_goals": _json_block(priority_goals),
+            "focus_areas": _json_block(focus_areas),
+            "top_keywords": _json_block(top_keywords),
+            "optimization_strategy": _json_block(optimization_strategy),
+            "years_exp": str(years_exp),
+            "section_flags": _json_block(section_flags),
+            "jd_scores_block": jd_scores_block,
+            "optimization_notes": str(optimization_notes),
+            "keywords_integrated": _json_block(keywords_integrated),
+            "changes_made": _json_block(changes_made),
+            "suggested_additions_if_true": _json_block(suggested_additions_if_true),
+            "optimized_sections": _json_block(optimized_sections),
+            "section_order": _json_block(list(section_order)),
+        },
     )
-
-    prompt = f"""
-        You are a senior career coach and executive resume strategist for PREMIUM users only.
-
-        Free-tier users receive generic, surface-level tips (max 5 bullets, no optimizer, no interview prep).
-        Your job is to deliver a white-glove, role-specific coaching report that feels worth paying for.
-
-        You have:
-        - The original resume
-        - Full intent analysis (target role, seniority, industry, strategy)
-        - Premium analyzer (certifications, languages, professional links, JD gaps)
-        - Premium ATS scoring with bonus signals
-        - An optimized resume draft from Agent 4 (before/after reference)
-
-        === SCORE DASHBOARD ===
-        {score_dashboard}
-
-        === RESUME TEXT (ORIGINAL) ===
-        {resume_text}
-
-        === USER GOAL ===
-        {user_goal}
-
-        === AGENT 1 — INTENT & CAREER TARGET ===
-        Target role: {target_role}
-        Seniority: {seniority_level}
-        Industry: {industry}
-        Priority goals: {_json_block(priority_goals)}
-        Focus areas: {_json_block(focus_areas)}
-        Top keywords: {_json_block(top_keywords)}
-        Optimization strategy: {_json_block(optimization_strategy)}
-
-        === AGENT 2 — STRUCTURE & PREMIUM SIGNALS ===
-        Estimated years of experience: {years_exp}
-        Section presence: {_json_block(section_flags)}
-        {jd_scores_block}
-
-        === AGENT 4 — OPTIMIZED RESUME (BEFORE → AFTER) ===
-        Optimization notes: {optimization_notes}
-        Keywords integrated: {_json_block(keywords_integrated)}
-        Changes made: {_json_block(changes_made)}
-        Suggested additions (only if true): {_json_block(suggested_additions_if_true)}
-        Optimized sections: {_json_block(optimized_sections)}
-        Full optimized resume (reference; summarize improvements, do not paste verbatim):
-        {optimized_resume}
-
-        === PREMIUM COACHING RULES ===
-        1. Write like a 1:1 career coach — confident, specific, encouraging, never generic.
-        2. Anchor everything to target_role, seniority_level, industry, and user_goal.
-        3. Use the score dashboard to prioritize what matters most (lowest scores = highest urgency).
-        4. Compare ORIGINAL vs OPTIMIZED: call out what Agent 4 fixed and what still needs human action.
-        5. Cover certifications, languages, and professional links — free tier cannot do this.
-        6. Give interview-ready advice: talking points tied to real resume evidence.
-        7. Include a recruiter_lens (6-second skim) AND competitive_positioning vs typical applicants.
-        8. Ground every claim in provided data — never invent employers, skills, metrics, or credentials.
-        9. If years_exp is 0 due to missing headings, recommend structure fixes — do not say "0 years experience".
-        10. Be substantially deeper than free tier: more detail, more strategy, more actionable sequencing.
-        11. A volunteer section, mention it as a plus.
-
-        === OUTPUT FORMAT ===
-        Return ONLY valid JSON (no markdown fences):
-        {{
-        "summary": "",
-        "skills_feedback": "",
-        "experience_feedback": "",
-        "structure_feedback": "",
-        "simple_suggestions": [],
-        "strength_highlights": [],
-        "growth_opportunities": [],
-        "jd_fit_analysis": "",
-        "certifications_feedback": "",
-        "languages_feedback": "",
-        "professional_links_feedback": "",
-        "optimizer_review": "",
-        "interview_talking_points": [],
-        "priority_action_plan": [],
-        "recruiter_lens": "",
-        "competitive_positioning": ""
-        }}
-
-        Field rules:
-        - summary: 3–5 sentence executive briefing — role fit, headline score, top win, top gap
-        - skills_feedback: detailed skills/JD keyword strategy; mention integrated keywords from Agent 4
-        - experience_feedback: bullet-level impact coaching; before/after emphasis from optimizer
-        - structure_feedback: ATS, sections, formatting, scannability, links
-        - simple_suggestions: max 5 quick wins (short bullets) for users who skim
-        - strength_highlights: max 5 evidence-backed strengths for this target role
-        - growth_opportunities: max 5 highest-leverage gaps (not generic advice)
-        {jd_fit_instruction}
-        - certifications_feedback: value and presentation of certs; gaps only if role-appropriate
-        - languages_feedback: language assets and how to leverage them for the role/market
-        - professional_links_feedback: LinkedIn/GitHub/portfolio presence and polish
-        - optimizer_review: what Agent 4 improved, what still needs manual editing, suggested_additions_if_true
-        - interview_talking_points: max 6 STAR-ready angles from real resume content
-        - priority_action_plan: max 6 ordered steps ("Week 1: ...", "Before applying: ...") — sequenced roadmap
-        - recruiter_lens: 2–3 sentences — how a recruiter reads this resume in a quick skim
-        - competitive_positioning: 2–4 sentences — how this candidate stands out vs typical {target_role} applicants
-        """
 
     response = await llm_call(prompt)
     if response:

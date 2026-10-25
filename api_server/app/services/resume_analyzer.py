@@ -146,19 +146,42 @@ def extract_skills_from_text_with_jd(text: str, jd_text: str, limit: int = 5):
 def extract_sections_from_text(text: str):
     text = re.sub(r"\r\n", "\n", text)
     section_patterns = {
-        "summary": r"^\s*(summary|objective|profile|professional summary|career objective|professional objective|summary of qualification)\b",
-        "skills": r"^\s*(skills|technical skills)\b",
-        "education": r"^\s*(education|academic background)\b",
-        "experience": r"^\s*(experience|work experience|employment history|professional experience)\b",
-        "projects": r"^\s*(projects|project experience)\b",
-        "certifications": r"^\s*(certifications|certification|courses|training|qualifications|credentials|licenses)\b",
-        "languages": r"^\s*(languages|language skills)\b",
-        "volunteer": r"^\s*(volunteer|volunteering|volunteer experience|community service|community involvement)\b",
+        "summary": (
+            r"summary of qualifications|professional summary|"
+            r"career objective|professional objective|summary|objective|profile"
+        ),
+        "skills": (
+            r"technical skills|core competencies|technical expertise|"
+            r"technical proficiencies|skills"
+        ),
+        "education": r"academic background|educational qualifications|education",
+        "experience": (
+            r"professional experience|work experience|employment history|"
+            r"relevant experience|work history|experience"
+        ),
+        "projects": r"project experience|personal projects|selected projects|projects",
+        "certifications": (
+            r"licenses and certifications|certifications|certification|"
+            r"courses|training|credentials|licenses"
+        ),
+        "languages": r"language skills|languages",
+        "volunteer": (
+            r"volunteer experience|community service|community involvement|"
+            r"volunteering|volunteer"
+        ),
     }
 
     matches = []
-    for section, pattern in section_patterns.items():
-        for match in re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE):
+    for section, aliases in section_patterns.items():
+        # Heading at the start of a line. Allow same-line content after an
+        # optional colon (PDF text often looks like "Languages: Python").
+        # \b keeps "experience" from matching "experiences".
+        pattern = re.compile(
+            rf"^[^\S\n]*\*{{0,2}}(?:{aliases})\*{{0,2}}\b[^\S\n]*:?",
+            re.IGNORECASE | re.MULTILINE,
+        )
+
+        for match in pattern.finditer(text):
             matches.append((section, match.start()))
 
     matches.sort(key=lambda x: x[1])
@@ -177,15 +200,38 @@ def extract_sections_from_text(text: str):
     return extracted
 
 
+_PHONE_PATTERN = re.compile(
+    r"""
+    (?<!\d)
+    (?:
+        \+\d{1,3}[-.\s]*\(?\d{2,4}\)?[-.\s]*\d{3,4}[-.\s]*\d{3,4}
+        |
+        \(\d{3}\)[-.\s]*\d{3}[-.\s]*\d{4}
+        |
+        \d{3}[-.\s]\d{3}[-.\s]\d{4}
+    )
+    (?!\d)
+    """,
+    re.VERBOSE,
+)
+
+
+def _is_phone_number(value: str) -> bool:
+    digits = re.sub(r"\D", "", value)
+    return 10 <= len(digits) <= 15
+
+
 def extract_contact_info(text: str):
     # Use regex to find potential email addresses and phone numbers
     email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-    phone_pattern = (
-        r"\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}"
-    )
 
-    emails = re.findall(email_pattern, text)
-    phones = re.findall(phone_pattern, text)
+    emails = list(set(re.findall(email_pattern, text)))
+    phones = [
+        match.group(0)
+        for match in _PHONE_PATTERN.finditer(text or "")
+        if _is_phone_number(match.group(0))
+    ]
+    phones = list(dict.fromkeys(phones))
 
     return {"emails": emails, "phone_numbers": phones}
 
@@ -379,31 +425,151 @@ def estimate_experience_years_from_sections(sections: dict):
     return __estimate_experience_years(text)
 
 
-def has_metrics(text: str):
-    # Check for presence of numbers that could indicate metrics in the experience section and/or projects section
+_MONTH_NAME = (
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+    r"jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|"
+    r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+)
+_BULLET_MARK = r"[•●▪‣○◆►·∙\-–—*+]"
+_BULLET_PREFIX = re.compile(
+    rf"^\s*(?:{_BULLET_MARK}|\d{{1,2}}[.)]|\(\d{{1,2}}\))\s*"
+)
+_BULLET_ONLY = re.compile(
+    rf"^\s*(?:{_BULLET_MARK}|\d{{1,2}}[.)]|\(\d{{1,2}}\))\s*$"
+)
+_SECTION_HEADING_LINE = re.compile(
+    r"^\s*(?:(?:work|professional|project)\s+)?"
+    r"(?:experience|projects|employment(?:\s+history)?)\s*:?\s*$",
+    re.IGNORECASE,
+)
+# Employment / project dates only — not currency or plain counts.
+_DATE_FRAGMENT = re.compile(
+    rf"""
+    (?:
+        {_MONTH_NAME}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:19|20)\d{{2}}
+        |
+        \d{{1,2}}(?:st|nd|rd|th)?\s+{_MONTH_NAME}\.?,?\s*(?:19|20)\d{{2}}
+        |
+        {_MONTH_NAME}\.?\s+(?:19|20)\d{{2}}
+        |
+        \d{{1,2}}[/.]\d{{1,2}}[/.](?:\d{{2}}|(?:19|20)\d{{2}})
+        |
+        \d{{1,2}}[/.](?:19|20)\d{{2}}
+        |
+        (?:19|20)\d{{2}}\s*[-–—]\s*(?:(?:19|20)\d{{2}}|present|current|now)
+        |
+        \b(?:present|current|now)\b
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+# Measurable outcomes only. [KMB] must not start a longer word (May, March, Mbps).
+_METRICS_PATTERN = re.compile(
+    r"""
+    (?:
+        \$\s*\d[\d,]*(?:\.\d+)?(?:\s*[KMB])?
+        |
+        \b\d+(?:\.\d+)?\s*(?:%|percent\b)
+        |
+        \b\d+(?:\.\d+)?\s*x\b
+        |
+        \b\d+(?:\.\d+)?\s*[KMB](?![A-Za-z])
+        |
+        \b\d+(?:\.\d+)?\s*(?:thousand|million|billion)\b
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+_SENTENCE_END = re.compile(r"""[.!?]"?$""")
+
+
+def _looks_like_date_or_heading(line: str) -> bool:
+    cleaned = line.strip()
+    if not cleaned or _SECTION_HEADING_LINE.match(cleaned):
+        return True
+    if re.fullmatch(r"(?:19|20)\d{2}", cleaned):
+        return True
+    remainder = _DATE_FRAGMENT.sub(" ", cleaned)
+    remainder = re.sub(r"(?i)\b(?:to|present|current|now)\b", " ", remainder)
+    remainder = re.sub(r"[\s,|:;()\[\]/–—\-]+", "", remainder)
+    return len(remainder) < 3
+
+
+def _should_join_wrapped_line(current: str, nxt: str) -> bool:
+    if not current:
+        return True
+    if not _SENTENCE_END.search(current):
+        return True
+    return bool(nxt) and nxt[0].islower()
+
+
+def _extract_metric_bullets(section_text: str) -> list[str]:
+    """Collect accomplishment bullets, joining PDF-wrapped lines.
+
+    Skips job/project headings and start–end date lines. PDF extractors often
+    emit a bullet mark on its own line, with the text (and wrapped overflow)
+    on the following lines.
+    """
+    if not section_text:
+        return []
+
+    lines = section_text.splitlines()
+    bullets: list[str] = []
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if not (_BULLET_ONLY.match(stripped) or _BULLET_PREFIX.match(stripped)):
+            index += 1
+            continue
+
+        content = _BULLET_PREFIX.sub("", stripped).strip()
+        index += 1
+        while index < len(lines):
+            nxt = lines[index].strip()
+            if not nxt:
+                index += 1
+                # PDF extractors often emit "•" then a blank line, then the text.
+                if not content:
+                    continue
+                break
+            if _BULLET_ONLY.match(nxt) or _BULLET_PREFIX.match(nxt):
+                break
+            if _looks_like_date_or_heading(nxt):
+                break
+            if not _should_join_wrapped_line(content, nxt):
+                break
+            content = f"{content} {nxt}".strip() if content else nxt
+            index += 1
+
+        if content and not _looks_like_date_or_heading(content):
+            bullets.append(content)
+
+    return bullets
+
+
+def _bullet_has_metric(bullet: str) -> bool:
+    without_dates = _DATE_FRAGMENT.sub(" ", bullet)
+    return bool(_METRICS_PATTERN.search(without_dates))
+
+
+def has_metrics(text: str) -> float:
     sections = extract_sections_from_text(text)
-    experience_text = sections.get("experience", "")
-    projects_text = sections.get("projects", "")
-    # Look for patterns including numbers, %, $, etc. in experience and projects sections
-    metrics_pattern = r"(\d+[\w%$]*)"
-    # Make sure every bullet point has some metrics
-    experience_bullets = [b for b in re.split(r"[\r\n]+", experience_text) if b.strip()]
-    projects_bullets = [b for b in re.split(r"[\r\n]+", projects_text) if b.strip()]
-    experience_metrics = sum(
-        bool(re.search(metrics_pattern, bullet)) for bullet in experience_bullets
+    bullets = _extract_metric_bullets(sections.get("experience", "")) + _extract_metric_bullets(
+        sections.get("projects", "")
     )
-    projects_metrics = sum(
-        bool(re.search(metrics_pattern, bullet)) for bullet in projects_bullets
-    )
-    total_bullets = len(experience_bullets) + len(projects_bullets)
-    if total_bullets == 0:
+
+    if not bullets:
         return 0.0
-    metrics_ratio = (experience_metrics + projects_metrics) / total_bullets
+
+    metrics_count = sum(_bullet_has_metric(bullet) for bullet in bullets)
+    metrics_ratio = metrics_count / len(bullets)
+
     if metrics_ratio >= 0.7:
         return 1.0
-    elif metrics_ratio >= 0.5:
+    if metrics_ratio >= 0.5:
         return 0.7
-    elif metrics_ratio >= 0.3:
+    if metrics_ratio >= 0.3:
         return 0.4
-    else:
-        return 0.0
+    if metrics_count > 0.01:
+        return 0.2
+    return 0.0

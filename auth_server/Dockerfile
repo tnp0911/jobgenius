@@ -19,7 +19,10 @@ FROM eclipse-temurin:17-jdk-noble
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 # Make the application files accessible to the non-root user
-RUN useradd --create-home nonrootuser \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home nonrootuser \
     && chown -R nonrootuser:nonrootuser /app
 
 # Run the application as the non-root user

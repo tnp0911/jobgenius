@@ -1,11 +1,17 @@
 # LLM involved in this agent
 import json
 import logging
+import re
+from pathlib import Path
 from typing import Any, Optional
 
-from app.helpers.llm_call import llm_call, safe_parse
+from app.helpers.llm_call import llm_call, safe_parse_optimizer
 
 logger = logging.getLogger(__name__)
+
+_INSTRUCTIONS_PATH = (
+    Path(__file__).parent.parent / "instructions" / "agent4_instructions.md"
+)
 
 
 def _pct(value: Any) -> float:
@@ -23,6 +29,182 @@ def _pct(value: Any) -> float:
 
 def _json_block(data: Any) -> str:
     return json.dumps(data if data is not None else {}, indent=2, default=str, ensure_ascii=False)
+
+
+def _score_or_na(value: Any) -> str:
+    return "N/A" if value is None else str(value)
+
+
+def _section_text(sections: dict, key: str) -> str:
+    value = sections.get(key, "")
+    if value is None or value == "":
+        return ""
+    return value if isinstance(value, str) else _json_block(value)
+
+
+def _fill_template(template: str, mapping: dict[str, str]) -> str:
+    prompt = template
+    for key, value in mapping.items():
+        prompt = prompt.replace("{" + key + "}", value)
+    return prompt
+
+
+_GROUNDING_STOP = {
+    "a",
+    "an",
+    "and",
+    "at",
+    "college",
+    "corp",
+    "inc",
+    "in",
+    "llc",
+    "ltd",
+    "of",
+    "the",
+    "to",
+    "university",
+}
+
+
+def _normalize_for_match(text: str) -> str:
+    return re.sub(r"[^a-z0-9#+.]+", " ", (text or "").lower()).strip()
+
+
+def _has_word(word: str, resume_norm: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(word)}\b", resume_norm))
+
+
+def _is_grounded(value: str, resume_norm: str) -> bool:
+    """True when value is empty or its distinctive name appears in the resume."""
+    norm = _normalize_for_match(value)
+    if not norm:
+        return True
+    if norm in resume_norm:
+        return True
+    significant = [
+        part
+        for part in norm.split()
+        if part not in _GROUNDING_STOP and len(part) >= 3
+    ]
+    if not significant:
+        return _has_word(norm.split()[0], resume_norm) if norm.split() else True
+    if len(significant) == 1:
+        return _has_word(significant[0], resume_norm)
+    matched = sum(1 for part in significant if _has_word(part, resume_norm))
+    return matched >= 2
+
+
+def _filter_skill_groups(groups: Any, resume_norm: str) -> list:
+    if not isinstance(groups, list):
+        return []
+    grounded = []
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        skills = [
+            skill
+            for skill in group.get("skills", [])
+            if isinstance(skill, str) and _is_grounded(skill, resume_norm)
+        ]
+        category = group.get("category", "")
+        if skills:
+            grounded.append({"category": category, "skills": skills})
+    return grounded
+
+
+def _filter_named_entries(
+    entries: Any,
+    name_key: str,
+    resume_norm: str,
+    fallback_key: str | None = None,
+) -> list:
+    if not isinstance(entries, list):
+        return []
+    grounded = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get(name_key, "")
+        fallback = entry.get(fallback_key, "") if fallback_key else ""
+        if _is_grounded(str(name), resume_norm) and str(name).strip():
+            grounded.append(entry)
+        elif not str(name).strip() and fallback and _is_grounded(str(fallback), resume_norm):
+            grounded.append(entry)
+    return grounded
+
+
+def _is_grounded_other_item(item: Any, resume_norm: str) -> bool:
+    if isinstance(item, str):
+        return _is_grounded(item, resume_norm)
+    if not isinstance(item, dict):
+        return False
+    name = item.get("company") or item.get("organization") or ""
+    title = item.get("title") or ""
+    if str(name).strip() and _is_grounded(str(name), resume_norm):
+        return True
+    return not str(name).strip() and bool(title) and _is_grounded(str(title), resume_norm)
+
+
+def _filter_other_sections(others: Any, resume_norm: str) -> list:
+    if not isinstance(others, list):
+        return []
+    grounded = []
+    for block in others:
+        if not isinstance(block, dict):
+            continue
+        items = [
+            item
+            for item in block.get("items", [])
+            if _is_grounded_other_item(item, resume_norm)
+        ]
+        if items:
+            grounded.append({"category": block.get("category", ""), "items": items})
+    return grounded
+
+
+# def ground_optimizer_output(parsed: dict, resume_text: str) -> dict:
+#     """Drop invented employers, schools, projects, skills, and certs."""
+#     if not isinstance(parsed, dict) or parsed.get("error"):
+#         return parsed
+
+#     sections = parsed.get("optimized_sections")
+#     if not isinstance(sections, dict):
+#         return parsed
+
+#     resume_norm = _normalize_for_match(resume_text)
+#     before = json.dumps(sections, sort_keys=True, default=str)
+
+#     sections["skills"] = _filter_skill_groups(sections.get("skills"), resume_norm)
+#     sections["experience"] = _filter_named_entries(
+#         sections.get("experience"), "company", resume_norm, "title"
+#     )
+#     sections["projects"] = _filter_named_entries(
+#         sections.get("projects"), "project_title", resume_norm
+#     )
+#     sections["education"] = _filter_named_entries(
+#         sections.get("education"), "school", resume_norm, "degree"
+#     )
+#     sections["other"] = _filter_other_sections(sections.get("other"), resume_norm)
+
+#     keywords = parsed.get("keywords_integrated")
+#     if isinstance(keywords, list):
+#         parsed["keywords_integrated"] = [
+#             keyword
+#             for keyword in keywords
+#             if isinstance(keyword, str) and _is_grounded(keyword, resume_norm)
+#         ]
+
+#     parsed["optimized_sections"] = sections
+#     after = json.dumps(sections, sort_keys=True, default=str)
+#     if before != after:
+#         notes = parsed.get("optimization_notes") or ""
+#         suffix = "Removed entries that were not supported by the original resume."
+#         if suffix not in notes:
+#             parsed["optimization_notes"] = f"{notes} {suffix}".strip()
+#         logger.warning("Agent 4: stripped unsupported invented optimizer entries")
+
+#     return parsed
 
 
 async def optimizer_agent(
@@ -52,190 +234,75 @@ async def optimizer_agent(
     if jd_text == "":
         jd_text = "No job description provided."
 
-    target_role = intent.get("target_role", "")
-    seniority_level = intent.get("seniority_level", "")
-    industry = intent.get("industry", "")
-    priority_goals = intent.get("priority_goals", [])
-    focus_areas = intent.get("focus_areas", [])
-    top_keywords = intent.get("top_keywords", [])
-    optimization_strategy = intent.get("optimization_strategy", {})
+    sections = analyzer.get("sections", {}) or {}
 
-    hard_skills = analyzer.get("hard_skills", [])
-    soft_skills = analyzer.get("soft_skills", [])
-    years_exp = analyzer.get("years_exp", 0)
-    section_flags = {
-        "has_summary": analyzer.get("has_summary", False),
-        "has_skills": analyzer.get("has_skills", False),
-        "has_experience": analyzer.get("has_experience", False),
-        "has_projects": analyzer.get("has_projects", False),
-        "has_education": analyzer.get("has_education", False),
-        "has_metrics": analyzer.get("has_metrics", False),
-        "has_contact": bool(analyzer.get("emails") or analyzer.get("phone_numbers")),
-    }
-    sections = analyzer.get("sections", {})
+    template = _INSTRUCTIONS_PATH.read_text(encoding="utf-8")
+    prompt = _fill_template(
+        template,
+        {
+            "resume_text": resume_text,
+            "user_goal": user_goal,
+            "job_description": jd_text,
+            "target_role": str(intent.get("target_role", "")),
+            "seniority_level": str(intent.get("seniority_level", "")),
+            "industry": str(intent.get("industry", "")),
+            "priority_goals": _json_block(intent.get("priority_goals", [])),
+            "focus_areas": _json_block(intent.get("focus_areas", [])),
+            "top_keywords": _json_block(intent.get("top_keywords", [])),
+            "optimization_strategy": _json_block(intent.get("optimization_strategy", {})),
+            "hard_skills": _json_block(analyzer.get("hard_skills", [])),
+            "soft_skills": _json_block(analyzer.get("soft_skills", [])),
+            "years_exp": str(analyzer.get("years_exp", 0)),
+            "sections": _json_block(sections),
+            "summary": _section_text(sections, "summary"),
+            "skills": _section_text(sections, "skills"),
+            "experience": _section_text(sections, "experience"),
+            "projects": _section_text(sections, "projects"),
+            "education": _section_text(sections, "education"),
+            "volunteer": _section_text(sections, "volunteer"),
+            "metrics": _json_block(
+                {
+                    "has_metrics": analyzer.get("has_metrics", False),
+                    "content": sections.get("metrics", ""),
+                }
+            ),
+            "contact": _json_block(
+                {
+                    "emails": analyzer.get("emails", []),
+                    "phone_numbers": analyzer.get("phone_numbers", []),
+                }
+            ),
+            "missing_hard_skills": _json_block(analyzer.get("missing_hard_skills", [])),
+            "missing_soft_skills": _json_block(analyzer.get("missing_soft_skills", [])),
+            "matching_hard_skills_score": str(
+                _pct(analyzer.get("matching_hard_skills_score", 0))
+            ),
+            "matching_soft_skills_score": str(
+                _pct(analyzer.get("matching_soft_skills_score", 0))
+            ),
+            "resume_score": str(_pct(ats.get("resume_score", 0))),
+            "section_score": str(_pct(ats.get("section_score", 0))),
+            "experience_projects_score": str(
+                _pct(ats.get("experience_projects_score", 0))
+            ),
+            "skills_quality_score": str(_pct(ats.get("skills_quality_score", 0))),
+            "summary_quality_score": str(_pct(ats.get("summary_quality_score", 0))),
+            "formatting_score": str(_pct(ats.get("formatting_score", 0))),
+            "ats_score": _score_or_na(ats.get("ats_score", 0)),
+            "hard_match_ats": _score_or_na(ats.get("hard_skills_score", 0)),
+            "soft_match_ats": _score_or_na(ats.get("soft_skills_score", 0)),
+            "certifications_score": str(ats.get("certifications_score", 0)),
+            "languages_score": str(ats.get("languages_score", 0)),
+            "professional_links_score": str(ats.get("professional_links_score", 0)),
+            "volunteer_score": str(ats.get("volunteer_score", 0)),
+        },
+    )
 
-    missing_hard_skills = analyzer.get("missing_hard_skills", [])
-    missing_soft_skills = analyzer.get("missing_soft_skills", [])
-    matching_hard_skills_score = _pct(analyzer.get("matching_hard_skills_score", 0))
-    matching_soft_skills_score = _pct(analyzer.get("matching_soft_skills_score", 0))
-
-    resume_score = _pct(ats.get("resume_score", 0))
-    section_score = _pct(ats.get("section_score", 0))
-    experience_projects_score = _pct(ats.get("experience_projects_score", 0))
-    skills_quality_score = _pct(ats.get("skills_quality_score", 0))
-    summary_quality_score = _pct(ats.get("summary_quality_score", 0))
-    formatting_score = _pct(ats.get("formatting_score", 0))
-    ats_score = ats.get("ats_score", 0)
-    hard_match_ats = ats.get("hard_skills_score", 0)
-    soft_match_ats = ats.get("soft_skills_score", 0)
-    certifications_score = ats.get("certifications_score", 0)
-    languages_score = ats.get("languages_score", 0)
-    professional_links_score = ats.get("professional_links_score", 0)
-    volunteer_score = ats.get("volunteer_score", 0)
-
-    if jd_text != "No job description provided.":
-        jd_block = f"""
-            === JOB DESCRIPTION ===
-            {jd_text}
-
-            === AGENT 2 — JD SKILL MATCH ===
-            Hard skills on resume: {_json_block(hard_skills)}
-            Soft skills on resume: {_json_block(soft_skills)}
-            Missing hard skills (JD, not on resume): {_json_block(missing_hard_skills)}
-            Missing soft skills (JD, not on resume): {_json_block(missing_soft_skills)}
-            Matching hard skills score: {matching_hard_skills_score}%
-            Matching soft skills score: {matching_soft_skills_score}%
-
-            === AGENT 3 — QUALITY & ATS SCORES ===
-            - Overall Resume Score: {resume_score}%
-            - Necessary Sections Score: {section_score}%
-            - Experience/Projects Score: {experience_projects_score}%
-            - Skills Quality Score: {skills_quality_score}%
-            - Summary Quality Score: {summary_quality_score}%
-            - Formatting Score: {formatting_score}%
-            - ATS Fit Score: {ats_score if ats_score is not None else "N/A"}%
-            - Hard Skills Match (ATS): {hard_match_ats if hard_match_ats is not None else "N/A"}%
-            - Soft Skills Match (ATS): {soft_match_ats if soft_match_ats is not None else "N/A"}%
-            Optional Scores:
-            - Certifications Score: {certifications_score}%
-            - Languages Score: {languages_score}%
-            - Professional Links Score: {professional_links_score}%
-            - Volunteer Score: {volunteer_score}%
-            """
-    else:
-        jd_block = f"""
-            === JOB DESCRIPTION ===
-            No job description provided. Optimize for the target role and user goal only.
-            Do NOT invent a JD or invent missing-JD skill claims.
-
-            === AGENT 2 — DETECTED SKILLS ===
-            Hard skills: {_json_block(hard_skills)}
-            Soft skills: {_json_block(soft_skills)}
-
-            === AGENT 3 — QUALITY SCORES ===
-            - Overall Resume Score: {resume_score}%
-            - Necessary Sections Score: {section_score}%
-            - Experience/Projects Score: {experience_projects_score}%
-            - Skills Quality Score: {skills_quality_score}%
-            - Summary Quality Score: {summary_quality_score}%
-            - Formatting Score: {formatting_score}%
-            Optional Scores:
-            - Certifications Score: {certifications_score}%
-            - Languages Score: {languages_score}%
-            - Professional Links Score: {professional_links_score}%
-            - Volunteer Score: {volunteer_score}%
-            """
-
-    prompt = f"""
-        You are an expert premium resume/CV optimizer for a job recommender system.
-
-        Your job: rewrite and optimize the user's resume for clarity, impact, ATS-friendly structure,
-        and alignment with the target role — using structured signals from earlier agents.
-
-        === ORIGINAL RESUME ===
-        {resume_text}
-
-        === USER GOAL ===
-        {user_goal}
-
-        === AGENT 1 — INTENT & GOALS ===
-        Target role: {target_role}
-        Seniority: {seniority_level}
-        Industry: {industry}
-        Priority goals: {_json_block(priority_goals)}
-        Focus areas: {_json_block(focus_areas)}
-        Top keywords: {_json_block(top_keywords)}
-        Optimization strategy: {_json_block(optimization_strategy)}
-
-        === AGENT 2 — STRUCTURE & SECTIONS ===
-        Estimated years of experience (from Experience section only; 0 if no Experience heading): {years_exp}
-        Section presence flags: {_json_block(section_flags)}
-        Extracted section contents (may be empty): {_json_block(sections)}
-        Contact emails: {_json_block(analyzer.get("emails", []))}
-        Phone numbers: {_json_block(analyzer.get("phone_numbers", []))}
-        {jd_block}
-
-        === HARD RULES (must follow) ===
-        1. Do NOT invent employers, job titles, dates, degrees, certifications, metrics, or skills
-        that are not present or clearly implied in the original resume.
-        2. You MAY rephrase, reorganize, strengthen wording, add clear section headings, and
-        convert weak bullets into stronger action-verb bullets — only using existing facts.
-        3. You MAY surface skills from Agent 2 / the original text more clearly in a Skills section.
-        4. If JD is provided:
-        - Emphasize overlapping keywords and skills already on the resume
-        - For missing skills: you may note them only under "suggested_additions_if_true"
-            (things the candidate should add IF they have them) — never claim them as fact
-        5. If the resume has no clear section headings, produce a structured resume with standard
-        headings: Summary, Skills, Experience (or Projects), Education as applicable.
-        6. Prefer quantified impact ONLY when numbers already exist; otherwise use clear qualitative impact.
-        7. Align tone to seniority_level and target_role from Agent 1.
-        8. Follow optimization_strategy.must_have as emphasis priorities; honor avoid list
-        (e.g. no generic fluff, no fake metrics).
-        9. Keep the optimized resume realistic, scannable, and suitable for ATS (plain text sections, clear headings).
-        10. If years_exp is 0 only because headings are missing, do NOT claim the candidate has zero experience;
-            structure whatever career content exists under Experience or Projects.
-
-        === OPTIMIZATION PRIORITIES ===
-        - Raise structure/readability (section_score, missing headings)
-        - Strengthen Summary for target_role
-        - Make Skills scannable and keyword-rich (without inventing)
-        - Rewrite Experience/Projects bullets for impact and clarity
-        - Integrate top_keywords naturally where already supported by content
-        - Address low ATS / match scores by emphasizing true overlaps (when JD exists)
-
-        === OUTPUT FORMAT ===
-        MUST RETURN VALID JSON.
-        Return ONLY valid JSON (no markdown fences):
-        {{
-        "optimized_resume": "",
-        "optimized_sections": {{
-            "summary": "",
-            "skills": "",
-            "experience": "",
-            "projects": "",
-            "education": "",
-            "other": ""
-        }},
-        "keywords_integrated": [],
-        "changes_made": [],
-        "suggested_additions_if_true": [],
-        "optimization_notes": ""
-        }}
-
-        Field rules:
-        - optimized_resume: full plain-text optimized CV with clear headings and line breaks (\\n)
-        - optimized_sections: same content broken into parts (empty string if N/A)
-        - keywords_integrated: max 12 keywords from Agent 1 / JD that you intentionally emphasized
-        - changes_made: max 8 short bullets describing what you improved (structure, wording, emphasis)
-        - suggested_additions_if_true: max 5 optional items the user could add IF true (metrics, missing JD skills they actually have)
-        - optimization_notes: 2–4 sentences on strategy used (role, scores, JD fit if any)
-        
-        Return a valid JSON is a MUST.
-        """
-
-    response = await llm_call(prompt)
+    response = await llm_call(prompt, temperature=0.1)
 
     if response:
         logger.info("Agent 4: Optimizer agent response received")
 
-    return safe_parse(response, "optimizer_agent")
+    parsed = safe_parse_optimizer(response, "optimizer_agent")
+    return parsed
+    # return ground_optimizer_output(parsed, resume_text)

@@ -64,7 +64,7 @@ async def analyze_resume_free_tier_route(
                 if usage and int(usage) > ANALYZER_LIMIT:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"You have reached the maximum number of resume analyses for free tier. Please try again in {FREE_ANALYZER_RESET_WINDOW} days.",
+                        detail="You have reached the maximum number of resume analyses for free tier.",
                     )
         resume_bytes = await convert_file_to_bytes(resume_pdf)
         resume_filename = resume_pdf.filename
@@ -153,7 +153,7 @@ async def analyze_resume_premium_route(
         if usage and int(usage) > ANALYZER_LIMIT:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You have reached the maximum number of resume analyses for today. Please try again in {PREMIUM_ANALYZER_RESET_WINDOW} days.",
+                detail="You have reached the maximum number of resume analyses for today.",
             )
         arq_pool = get_arq_pool()
         job_id = str(uuid4())
@@ -165,7 +165,7 @@ async def analyze_resume_premium_route(
             )
             job_finder_usage = await redis_client.get(job_finder_usage_key)
             if job_finder_usage and int(job_finder_usage) > JOB_FINDER_LIMIT:
-                message = f"You have reached the maximum number of job finder calls for {JOB_FINDER_RESET_WINDOW} days. We will disable the job finder feature for you in this session. Please try again in {JOB_FINDER_RESET_WINDOW} days."
+                message = "You have reached the maximum number of job finder calls."
                 includes_job_finder = False
 
         resume_bytes = await convert_file_to_bytes(resume_pdf)

@@ -42,12 +42,30 @@ SAMPLE_ANALYSIS = {
         "simple_suggestions": ["Add metrics"],
     },
     "optimizer": {
-        "optimized_resume": "Optimized text",
-        "optimized_sections": {},
+        "section_order": ["summary", "skills", "experience", "projects", "education"],
+        "optimized_sections": {
+            "summary": "Summary",
+            "skills": "Skills",
+            "experience": "Experience",
+            "projects": "Projects",
+            "education": "Education",
+        },
         "keywords_integrated": ["python"],
         "changes_made": [],
         "suggested_additions_if_true": [],
         "optimization_notes": "",
+    },
+}
+
+UPDATED_ANALYSIS = {
+    **SAMPLE_ANALYSIS,
+    "intent": {
+        **SAMPLE_ANALYSIS["intent"],
+        "target_role": "Senior Software Engineer",
+    },
+    "feedback": {
+        **SAMPLE_ANALYSIS["feedback"],
+        "summary": "Updated analysis after re-run",
     },
 }
 
@@ -69,14 +87,18 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
     monkeypatch.chdir(tmp_path)
 
     pdf_bytes = Path(r"D:\IT\My Projects\job_recommender_system\api_server\external\Tuong_Nguyen_Pham_Resume.pdf").read_bytes()
-    resume_id = f"{TEST_USER_ID}_{TEST_FILENAME}"
+    extracted_filename = Path(TEST_FILENAME).stem
+    resume_id = f"{TEST_USER_ID}_{extracted_filename}"
+    resume_text = Path(r"D:\IT\My Projects\job_recommender_system\api_server\external\Tuong_Nguyen_Pham_Resume.txt").read_text()
+    resume_text = resume_text.strip()
 
     mongo = get_mongo_client()
     db = mongo[settings.MONGODB_NAME]
     await db["resumes"].delete_many({"user_id": TEST_USER_ID})
     await db["resume_for_job_recommendation"].delete_many({"resume_id": resume_id})
 
-    ok = await store_resume_to_mongodb(TEST_USER_ID, TEST_FILENAME, pdf_bytes, SAMPLE_ANALYSIS)
+    # Test store resume to MongoDB
+    ok = await store_resume_to_mongodb(TEST_USER_ID, TEST_FILENAME, resume_text, pdf_bytes, SAMPLE_ANALYSIS)
     assert ok is True
 
     doc = await db["resumes"].find_one(
@@ -86,8 +108,8 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
     assert doc is not None
     assert doc["user_id"] == TEST_USER_ID
     assert doc["version"] == 1
-    assert doc["filename"] == TEST_FILENAME
-    assert doc["storage_path"] == f"{TEST_USER_ID}/{TEST_FILENAME}/1.pdf"
+    assert doc["filename"] == extracted_filename
+    assert doc["storage_path"] == f"{TEST_USER_ID}/{extracted_filename}_1.pdf"
     assert doc.get("content_sha256")
     assert "analysis" in doc
     assert doc["analysis"]["target_role"] == "Software Engineer"
@@ -115,7 +137,10 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
     assert view_url.startswith("https://") or view_url.startswith("http://")
     print(view_url)
 
-    ok_again = await store_resume_to_mongodb(TEST_USER_ID, TEST_FILENAME, pdf_bytes, SAMPLE_ANALYSIS)
+    # Same PDF: keep version, replace analysis
+    ok_again = await store_resume_to_mongodb(
+        TEST_USER_ID, TEST_FILENAME, resume_text, pdf_bytes, UPDATED_ANALYSIS
+    )
     assert ok_again is True
 
     latest = await db["resumes"].find_one(
@@ -123,17 +148,23 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
         sort=[("version", -1)],
     )
     assert latest["version"] == 1
-    assert latest["storage_path"] == f"{TEST_USER_ID}/{TEST_FILENAME}/1.pdf"
-    assert latest.get("content_sha256")
+    assert latest["storage_path"] == doc["storage_path"]
+    assert latest.get("content_sha256") == doc.get("content_sha256")
+    assert latest["analysis"]["target_role"] == "Senior Software Engineer"
+    assert latest["analysis"]["summary"] == "Updated analysis after re-run"
+    assert await db["resumes"].count_documents({"resume_id": resume_id}) == 1
 
     updated_rec = await db["resume_for_job_recommendation"].find_one(
         {"resume_id": resume_id}
     )
     assert updated_rec["version"] == 1
+    assert "Senior Software Engineer" in updated_rec["full_combined_text"]
+    assert "Updated analysis after re-run" in updated_rec["full_combined_text"]
 
+    # Test store resume to MongoDB with changed PDF bytes
     changed_pdf = pdf_bytes + b"\x00"
     ok_changed = await store_resume_to_mongodb(
-        TEST_USER_ID, TEST_FILENAME, changed_pdf, SAMPLE_ANALYSIS
+        TEST_USER_ID, TEST_FILENAME, resume_text, changed_pdf, SAMPLE_ANALYSIS
     )
     assert ok_changed is True
     bumped = await db["resumes"].find_one(
@@ -141,7 +172,7 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
         sort=[("version", -1)],
     )
     assert bumped["version"] == 2
-    assert bumped["storage_path"] == f"{TEST_USER_ID}/{TEST_FILENAME}/2.pdf"
+    assert bumped["storage_path"] == f"{TEST_USER_ID}/{extracted_filename}_2.pdf"
 
     # Cleanup left out on purpose so you can inspect MongoDB + S3 after the run:
     # user_id=999001, resume_id=999001_integration_test_resume.pdf

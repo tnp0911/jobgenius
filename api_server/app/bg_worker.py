@@ -47,9 +47,9 @@ async def store_jobs_to_pinecone_arq(ctx, jobs: list):
 
 
 async def store_resume_to_mongodb_arq(
-    ctx, user_id: int, resume_filename: str, pdf_bytes: bytes, analyzed_result: dict
+    ctx, user_id: int, resume_filename: str, resume_text: str, pdf_bytes: bytes, analyzed_result: dict
 ):
-    await store_resume_to_mongodb(user_id, resume_filename, pdf_bytes, analyzed_result)
+    await store_resume_to_mongodb(user_id, resume_filename, resume_text, pdf_bytes, analyzed_result)
     logger.info(f"Resume stored to MongoDB: {resume_filename}")
 
 
