@@ -38,7 +38,7 @@ def _pdf_sha256(pdf_bytes: bytes) -> str:
     return hashlib.sha256(pdf_bytes).hexdigest()
 
 
-def _read_s3_object_bytes(s3_client, key: str) -> bytes | None:
+def read_s3_object_bytes(s3_client, key: str) -> bytes | None:
     try:
         obj = s3_client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
         body = obj.get("Body")
@@ -61,7 +61,7 @@ async def _is_same_pdf(
         return False
 
     existing_bytes = await asyncio.to_thread(
-        _read_s3_object_bytes, s3_client, storage_path
+        read_s3_object_bytes, s3_client, storage_path
     )
     if existing_bytes is None:
         return False
@@ -106,7 +106,7 @@ async def _upsert_job_recommendation(
 
 async def store_resume_to_mongodb(
     user_id: int, resume_filename: str, resume_text: str, pdf_bytes: bytes, analyzed_result: dict
-):
+) -> int | None:
     try:
         s3_client = await get_s3_client()
         mongo_client = get_mongo_client()
@@ -152,7 +152,7 @@ async def store_resume_to_mongodb(
                 current_version,
                 full_combined_text,
             )
-            return True
+            return current_version
 
         next_version = (existing_resume["version"] + 1) if existing_resume else 1
         storage_key = f"{user_id}/{extracted_filename}_{next_version}.pdf"
@@ -185,10 +185,10 @@ async def store_resume_to_mongodb(
             full_combined_text,
         )
 
-        return True
+        return next_version
     except Exception as e:
         logger.error(f"Error storing resume to MongoDB: {e}")
-        return False
+        return None
 
 
 async def get_resumes_from_mongodb(user_id: int):
@@ -418,3 +418,48 @@ async def resolve_resume_id_for_recommendations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_SERVER_ERROR: An error occurred while resolving the resume id for recommendations. Please try again later.",
         )
+
+
+async def overwrite_resume_in_s3(
+    s3_client, user_id: int, filename: str, version: int, pdf_bytes: bytes, full_combined_text: str
+):
+    try:
+        await asyncio.to_thread(
+            s3_client.put_object,
+            Bucket=settings.S3_BUCKET_NAME,
+            Key=f"{user_id}/{filename}_{version}.pdf", 
+            Body=pdf_bytes,
+            ContentType="application/pdf",
+            ContentDisposition="inline",
+        )
+
+        mongo_client = get_mongo_client()
+        mongo_db = mongo_client[settings.MONGODB_NAME]
+        resume_collection = mongo_db["resumes"]
+        resume_for_job_recommendation_collection = mongo_db[
+            "resume_for_job_recommendation"
+        ]
+        resume_id_generator = f"{user_id}_{filename}"
+        digest = _pdf_sha256(pdf_bytes)
+        await resume_collection.update_one(
+            {"resume_id": resume_id_generator, "version": version},
+            {"$set": {
+                "content_sha256": digest,
+                "updated_with_optimizer": True,
+                "updated_at": datetime.now(timezone.utc),
+            }},
+        )
+        await _upsert_job_recommendation(
+            resume_for_job_recommendation_collection,
+            user_id,
+            resume_id_generator,
+            version,
+            full_combined_text,
+        )
+    except Exception as e:
+        logger.error(f"Error at overwrite_resume_in_s3: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_SERVER_ERROR: An error occurred while overwriting the resume in S3. Please try again later.",
+        )
+

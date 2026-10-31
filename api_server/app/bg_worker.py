@@ -9,7 +9,7 @@ from app.db.mongo import close_mongo, init_mongo
 from app.db.pinecone import close_pinecone, init_pinecone
 from app.db.redis import close_redis, init_redis
 from app.db.s3 import close_s3_client, init_s3_client
-from app.services.arq_logic import analyze_resume_premium
+from app.services.arq_logic import analyze_resume_premium, rerender_resume_premium
 from app.services.job_service import store_jobs_to_pinecone
 from app.services.resume_service import store_resume_to_mongodb
 from arq.connections import RedisSettings
@@ -81,11 +81,22 @@ async def analyze_resume_premium_arq(
     )
 
 
+async def rerender_resume_premium_arq(
+    ctx,
+    job_id: str,
+    user_id: int,
+    resume_filename: str,
+    version: int,
+):
+    await rerender_resume_premium(job_id, user_id, resume_filename, version)
+    logger.info(f"Resume rerendered for user_id: {user_id}, job_id: {job_id}, filename: {resume_filename}")
+
 class WorkerSettings:
     functions: ClassVar[list] = [
         store_jobs_to_pinecone_arq,
         store_resume_to_mongodb_arq,
         analyze_resume_premium_arq,
+        rerender_resume_premium_arq,
     ]
     redis_settings = RedisSettings(
         host=settings.REDIS_HOST,
