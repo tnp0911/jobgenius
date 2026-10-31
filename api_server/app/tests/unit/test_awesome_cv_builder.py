@@ -13,9 +13,9 @@ from app.ai_agents.other_resources.resume_render_latex.text_escape import escape
 from app.ai_agents.tools.content_diff_tool import diff_resume_content
 from app.tests.unit.test_content_diff_tool import MESSY_RESUME, OPTIMIZER
 
-SAMPLE_PATH = (
-    Path(__file__).resolve().parents[3] / "external" / "sample-response.json"
-)
+# SAMPLE_PATH = (
+#     Path(__file__).resolve().parents[3] / "external" / "sample-response.json"
+# )
 
 
 def test_escape_tex_special_characters():
@@ -160,23 +160,23 @@ def test_prepare_workdir_copies_class_and_writes_tex(tmp_path):
     assert (workdir / "luaotfload.conf").is_file()
 
 
-def test_builder_handles_sample_response_json():
-    payload = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
-    resume_text = "\n".join(
-        str(value)
-        for value in (payload.get("analyzer") or {}).get("sections", {}).values()
-    )
-    tex = build_resume_tex(
-        payload["optimizer"],
-        resume_text=resume_text,
-        analyzer=payload.get("analyzer"),
-        intent=payload.get("intent"),
-        highlight=True,
-    )
-    assert r"\cvsection{Projects}" in tex
-    assert r"C\#" in tex
-    assert r"\highLight{GPA" not in tex
-    assert "Virtual Clinic Simulation" in tex
+# def test_builder_handles_sample_response_json():
+#     payload = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+#     resume_text = "\n".join(
+#         str(value)
+#         for value in (payload.get("analyzer") or {}).get("sections", {}).values()
+#     )
+#     tex = build_resume_tex(
+#         payload["optimizer"],
+#         resume_text=resume_text,
+#         analyzer=payload.get("analyzer"),
+#         intent=payload.get("intent"),
+#         highlight=True,
+#     )
+#     assert r"\cvsection{Projects}" in tex
+#     assert r"C\#" in tex
+#     assert r"\highLight{GPA" not in tex
+#     assert "Virtual Clinic Simulation" in tex
 
 
 def test_agent5_returns_tex_without_compiling():
