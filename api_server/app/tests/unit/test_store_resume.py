@@ -84,11 +84,11 @@ async def test_same_pdf_updates_analysis_without_new_version(monkeypatch):
     monkeypatch.setattr(resume_service, "get_s3_client", AsyncMock(return_value=s3_client))
     monkeypatch.setattr(resume_service, "get_mongo_client", lambda: mongo_client)
 
-    ok = await resume_service.store_resume_to_mongodb(
+    version = await resume_service.store_resume_to_mongodb(
         1, "foo.pdf", "resume text", pdf_bytes, UPDATED_ANALYSIS
     )
 
-    assert ok is True
+    assert version == 1
     resume_collection.insert_one.assert_not_called()
     s3_client.put_object.assert_not_called()
     resume_collection.update_one.assert_awaited_once()
@@ -119,11 +119,11 @@ async def test_changed_pdf_inserts_new_version(monkeypatch):
     monkeypatch.setattr(resume_service, "get_mongo_client", lambda: mongo_client)
     monkeypatch.setattr(resume_service.asyncio, "to_thread", AsyncMock(return_value=None))
 
-    ok = await resume_service.store_resume_to_mongodb(
+    version = await resume_service.store_resume_to_mongodb(
         1, "foo.pdf", "resume text", b"%PDF-1.4 new", SAMPLE_ANALYSIS
     )
 
-    assert ok is True
+    assert version == 2
     resume_collection.update_one.assert_not_called()
     resume_collection.insert_one.assert_awaited_once()
     inserted = resume_collection.insert_one.await_args.args[0]

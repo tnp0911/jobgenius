@@ -101,6 +101,7 @@ def test_summary_and_bullets_ignore_pdf_wrap_and_tabs():
     first = bullets[0]
     assert first["key"] == "1"
     assert "\n" not in first["original"]
+    assert "\t" not in first["original"]
     assert "team of 4 people" in first["original"]
     assert first["original"].startswith("Was the team lead")
     assert "Led a team of 4" in first["optimized"]

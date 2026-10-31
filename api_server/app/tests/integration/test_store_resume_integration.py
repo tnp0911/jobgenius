@@ -98,8 +98,8 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
     await db["resume_for_job_recommendation"].delete_many({"resume_id": resume_id})
 
     # Test store resume to MongoDB
-    ok = await store_resume_to_mongodb(TEST_USER_ID, TEST_FILENAME, resume_text, pdf_bytes, SAMPLE_ANALYSIS)
-    assert ok is True
+    version = await store_resume_to_mongodb(TEST_USER_ID, TEST_FILENAME, resume_text, pdf_bytes, SAMPLE_ANALYSIS)
+    assert version == 1
 
     doc = await db["resumes"].find_one(
         {"resume_id": resume_id},
@@ -138,10 +138,10 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
     print(view_url)
 
     # Same PDF: keep version, replace analysis
-    ok_again = await store_resume_to_mongodb(
+    version_again = await store_resume_to_mongodb(
         TEST_USER_ID, TEST_FILENAME, resume_text, pdf_bytes, UPDATED_ANALYSIS
     )
-    assert ok_again is True
+    assert version_again == 1
 
     latest = await db["resumes"].find_one(
         {"resume_id": resume_id},
@@ -163,10 +163,10 @@ async def test_store_resume_to_mongodb_integration(infra, tmp_path, monkeypatch)
 
     # Test store resume to MongoDB with changed PDF bytes
     changed_pdf = pdf_bytes + b"\x00"
-    ok_changed = await store_resume_to_mongodb(
+    version_changed = await store_resume_to_mongodb(
         TEST_USER_ID, TEST_FILENAME, resume_text, changed_pdf, SAMPLE_ANALYSIS
     )
-    assert ok_changed is True
+    assert version_changed == 2
     bumped = await db["resumes"].find_one(
         {"resume_id": resume_id},
         sort=[("version", -1)],
