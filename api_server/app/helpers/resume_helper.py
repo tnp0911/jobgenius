@@ -88,28 +88,25 @@ def _section_names(sections: Any) -> list[str]:
 
 
 
-def format_analyzer_result(result: dict) -> dict:
+def format_analyzer_result(result: dict) -> dict[str, Any]:
     """
-    Format the result of the multi-agents to a proper format before saving to the database (MongoDB)
+    Format the result of the multi-agents to a proper format
+
+    Return type: dict[str, Any] in JSON format
     """
     intent = _as_dict(result.get("intent"))
     analyzer = _as_dict(result.get("analyzer"))
     ats = _as_dict(result.get("ats"))
     feedback = _as_dict(result.get("feedback"))
-    optimizer = _as_dict(result.get("optimizer"))
+    optimizer = _as_dict(result.get("optimizer") or {})
 
     analysis = ResumeAnalysis(
+        # Intent agent
         target_role=str(intent.get("target_role") or ""),
         seniority_level=str(intent.get("seniority_level") or ""),
         industry=str(intent.get("industry") or ""),
-        priority_goals=_as_list(intent.get("priority_goals")),
-        focus_areas=_as_list(intent.get("focus_areas")),
         top_keywords=_as_list(intent.get("top_keywords")),
-        optimization_strategy=_as_dict(intent.get("optimization_strategy")),
-        sections=_section_names(analyzer.get("sections")),
-        years_exp=_as_int(analyzer.get("years_exp")),
-        emails=_as_list(analyzer.get("emails")),
-        phone_numbers=_as_list(analyzer.get("phone_numbers")),
+        # Analyzer agent
         hard_skills=_as_list(analyzer.get("hard_skills")),
         soft_skills=_as_list(analyzer.get("soft_skills")),
         missing_hard_skills=_as_list(analyzer.get("missing_hard_skills")) or None,
@@ -124,6 +121,7 @@ def format_analyzer_result(result: dict) -> dict:
             if analyzer.get("matching_soft_skills_score") is not None
             else None
         ),
+        # ATS agent
         resume_score=_as_float(ats.get("resume_score")),
         section_score=_as_float(ats.get("section_score")),
         experience_projects_score=_as_float(ats.get("experience_projects_score")),
@@ -133,12 +131,14 @@ def format_analyzer_result(result: dict) -> dict:
         ats_score=_as_float(ats["ats_score"]) if ats.get("ats_score") is not None else None,
         hard_skills_score=_as_float(ats["hard_skills_score"]) if ats.get("hard_skills_score") is not None else None,
         soft_skills_score=_as_float(ats["soft_skills_score"]) if ats.get("soft_skills_score") is not None else None,
-        section_order=_as_list(optimizer.get("section_order")),
-        optimized_sections=_as_dict(optimizer.get("optimized_sections")) or None,
-        keywords_integrated=_as_list(optimizer.get("keywords_integrated")),
+        # Optimizer agent
+        section_order=_as_list(optimizer.get("section_order") or []),
+        optimized_sections=_as_dict(optimizer.get("optimized_sections") or {}),
+        keywords_integrated=_as_list(optimizer.get("keywords_integrated") or []),
         changes_made=_as_list(optimizer.get("changes_made") or []),
         suggested_additions_if_true=_as_list(optimizer.get("suggested_additions_if_true") or []),
         optimization_notes=str(optimizer.get("optimization_notes") or ""),
+        # Finalizer agent
         summary=str(feedback.get("summary") or ""),
         skills_feedback=str(feedback.get("skills_feedback") or ""),
         experience_feedback=str(feedback.get("experience_feedback") or ""),
@@ -160,13 +160,63 @@ def format_analyzer_result(result: dict) -> dict:
     return analysis.model_dump(mode="json")
 
 
+def nested_agents_from_result(result: dict) -> dict[str, Any]:
+    """Rebuild intent/analyzer/optimizer/feedback from graph state or a flat dump."""
+    result = result if isinstance(result, dict) else {}
+    nested_intent = result.get("intent")
+    nested_optimizer = result.get("optimizer")
+    nested_analyzer = result.get("analyzer")
+    if isinstance(nested_intent, dict) or isinstance(nested_optimizer, dict) or isinstance(
+        nested_analyzer, dict
+    ):
+        return {
+            "intent": _as_dict(nested_intent),
+            "analyzer": _as_dict(nested_analyzer),
+            "optimizer": _as_dict(nested_optimizer),
+            "feedback": _as_dict(result.get("feedback") or result.get("finalizer")),
+        }
+    return {
+        "intent": {
+            "target_role": str(result.get("target_role") or ""),
+            "seniority_level": str(result.get("seniority_level") or ""),
+            "industry": str(result.get("industry") or ""),
+            "top_keywords": _as_list(result.get("top_keywords")),
+        },
+        "analyzer": {
+            "hard_skills": _as_list(result.get("hard_skills")),
+            "soft_skills": _as_list(result.get("soft_skills")),
+        },
+        "optimizer": {
+            "section_order": _as_list(result.get("section_order")),
+            "optimized_sections": _as_dict(result.get("optimized_sections")),
+            "keywords_integrated": _as_list(result.get("keywords_integrated")),
+            "changes_made": _as_list(result.get("changes_made")),
+            "suggested_additions_if_true": _as_list(
+                result.get("suggested_additions_if_true")
+            ),
+            "optimization_notes": str(result.get("optimization_notes") or ""),
+        },
+        "feedback": {
+            "summary": str(result.get("summary") or ""),
+            "skills_feedback": str(result.get("skills_feedback") or ""),
+            "experience_feedback": str(result.get("experience_feedback") or ""),
+            "structure_feedback": str(result.get("structure_feedback") or ""),
+            "simple_suggestions": _as_list(result.get("simple_suggestions")),
+            "jd_fit_analysis": str(result.get("jd_fit_analysis") or ""),
+            "competitive_positioning": str(result.get("competitive_positioning") or ""),
+            "optimizer_review": str(result.get("optimizer_review") or ""),
+        },
+    }
+
+
 def analyzer_result_to_text(resume_text: str, result: dict) -> str:
     """
     Convert the result of the multi-agents to a single meaningful text for job recommendation
     """
-    intent = _as_dict(result.get("intent"))
-    analyzer = _as_dict(result.get("analyzer"))
-    feedback = _as_dict(result.get("feedback") or result.get("finalizer"))
+    agents = nested_agents_from_result(result)
+    intent = agents["intent"]
+    analyzer = agents["analyzer"]
+    feedback = agents["feedback"]
     resume_text = resume_text.strip()
 
     hard_skills = ", ".join(_as_list(analyzer.get("hard_skills")))
