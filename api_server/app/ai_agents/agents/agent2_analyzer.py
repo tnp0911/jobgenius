@@ -17,14 +17,14 @@ def analyzer_agent_free_tier(resume_text, industry: str = "", jd_text: str = "")
     """
     sections = extract_sections_from_text(resume_text)
     years_exp = estimate_experience_years_from_sections(sections)
-    has_summary_bool = True if "summary" in sections else False
-    has_skills_bool = True if "skills" in sections else False
-    has_experience_bool = True if "experience" in sections else False
-    has_projects_bool = True if "projects" in sections else False
-    has_education_bool = True if "education" in sections else False
+    has_summary_bool = "summary" in sections
+    has_skills_bool = "skills" in sections
+    has_experience_bool = "experience" in sections
+    has_projects_bool = "projects" in sections
+    has_education_bool = "education" in sections
     contact_info = extract_contact_info(resume_text)
     skills_info = None
-    has_metrics_bool = True if has_metrics(resume_text) > 0 else False
+    has_metrics_bool = has_metrics(resume_text) > 0.0
 
     if jd_text == "":
         skills_info = extract_skills_from_text_without_jd(resume_text, industry)
@@ -79,7 +79,7 @@ def analyzer_agent_premium(resume_text, industry: str = "", jd_text: str = ""):
     for key, value in analyzer_agent_free_tier_result.items():
         results[key] = value
     sections = extract_sections_from_text(resume_text)
-    has_volunteer_bool = True if "volunteer" in sections else False
+    has_volunteer_bool = "volunteer" in sections
     results["certifications"] = extract_certifications(
         sections.get("certifications", "")
     )

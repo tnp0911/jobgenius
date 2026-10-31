@@ -12,11 +12,11 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-async def llm_call(prompt: str):
+async def llm_call(prompt: str, temperature: float = 0.5):
     try:
         client = OllamaLLM(
             model=settings.OLLAMA_MODEL,
-            temperature=0.5,
+            temperature=temperature,
             base_url=settings.OLLAMA_HOST,
         )
         response = await client.ainvoke(prompt)
@@ -78,6 +78,174 @@ def safe_parse(response: str, agent_name="unknown"):
         "error": "Invalid JSON",
         "agent": agent_name,
         "raw": response
+    }
+
+_OPTIMIZER_SECTION_KEYS = (
+    "summary",
+    "skills",
+    "experience",
+    "projects",
+    "education",
+    "other",
+)
+
+
+def _strip_code_fences(text: str) -> str:
+    cleaned = text.strip()
+    cleaned = re.sub(r"^```(?:json|JSON)?[ \t]*\n?", "", cleaned)
+    cleaned = re.sub(r"\n?```[ \t]*$", "", cleaned)
+    if "```" not in cleaned:
+        return cleaned.strip()
+
+    fenced = re.search(
+        r"```(?:json|JSON)?\s*(\{.*\})\s*```",
+        cleaned,
+        re.DOTALL,
+    )
+    if fenced:
+        return fenced.group(1).strip()
+
+    unclosed = re.search(r"```(?:json|JSON)?\s*(\{.*)", cleaned, re.DOTALL)
+    if unclosed:
+        return unclosed.group(1).strip()
+    return cleaned.strip()
+
+
+def _looks_escaped_json(text: str) -> bool:
+    return bool(re.search(r'\\n|\\t|\\"|\\r', text)) and "{" in text
+
+
+def _unescape_json_text(text: str) -> str:
+    try:
+        return codecs.decode(text, "unicode_escape")
+    except Exception:
+        return (
+            text.replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t")
+            .replace('\\"', '"')
+        )
+
+
+def _unwrap_json_string(text: str) -> str:
+    stripped = text.strip()
+    if len(stripped) >= 2 and stripped[0] == '"' and stripped[-1] == '"':
+        try:
+            inner = json.loads(stripped)
+        except json.JSONDecodeError:
+            return text
+        if isinstance(inner, str):
+            return inner
+    return text
+
+
+def _normalize_optimizer_payload(parsed: Any) -> Any:
+    if not isinstance(parsed, dict) or parsed.get("error"):
+        return parsed
+    sections = parsed.get("optimized_sections")
+    if isinstance(sections, dict):
+        return parsed
+    lifted = {
+        key: parsed[key] for key in _OPTIMIZER_SECTION_KEYS if key in parsed
+    }
+    if not lifted:
+        return parsed
+    normalized = {
+        key: value
+        for key, value in parsed.items()
+        if key not in _OPTIMIZER_SECTION_KEYS
+    }
+    normalized["optimized_sections"] = lifted
+    return normalized
+
+
+def _extract_json_object(text: str) -> str | None:
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_str = False
+    escape = False
+    for i, ch in enumerate(text[start:], start):
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def _fix_trailing_commas(text: str) -> str:
+    return re.sub(r",(\s*[}\]])", r"\1", text)
+
+
+def _is_optimizer_payload(parsed: Any) -> bool:
+    if not isinstance(parsed, dict) or parsed.get("error"):
+        return False
+    sections = parsed.get("optimized_sections")
+    if not isinstance(sections, dict):
+        return False
+    return any(key in sections for key in _OPTIMIZER_SECTION_KEYS)
+
+
+def _optimizer_candidates(response: str) -> list[str]:
+    texts = [response, _unwrap_json_string(response)]
+    if _looks_escaped_json(response):
+        texts.append(_unescape_json_text(response))
+        texts.append(_unescape_json_text(_unwrap_json_string(response)))
+
+    candidates: list[str] = []
+    for text in texts:
+        stripped = _strip_code_fences(text)
+        if _looks_escaped_json(stripped):
+            stripped = _unescape_json_text(stripped)
+        extracted = _extract_json_object(stripped)
+        if extracted:
+            candidates.append(extracted)
+        candidates.append(stripped)
+    return candidates
+
+
+def safe_parse_optimizer(response: str, agent_name="optimizer_agent"):
+    """Parse Agent 4 JSON without the shared safe_parse regex / quote-swap."""
+    if not response or not isinstance(response, str):
+        return {
+            "error": "Empty or invalid response",
+            "agent": agent_name,
+            "raw": response,
+        }
+
+    seen = set()
+    for candidate in _optimizer_candidates(response):
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        for text in (candidate, _fix_trailing_commas(candidate)):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            parsed = _normalize_optimizer_payload(parsed)
+            if _is_optimizer_payload(parsed):
+                return parsed
+
+    logger.error("[ERROR] %s returned invalid optimizer JSON", agent_name)
+    logger.error("Response: %s", response)
+    return {
+        "error": "Invalid JSON",
+        "agent": agent_name,
+        "raw": response,
     }
 
 

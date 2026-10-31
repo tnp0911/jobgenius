@@ -1,1 +1,10 @@
 .env*
+.git
+.github
+.gitignore
+.gitattributes
+
+Dockerfile
+.dockerignore
+
+.cursorignore

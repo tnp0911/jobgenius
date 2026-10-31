@@ -15,8 +15,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
 COPY --from=builder /app/.venv /app/.venv
+COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY app ./app
-RUN useradd --create-home nonrootuser && chown -R nonrootuser:nonrootuser /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home nonrootuser \
+    && chown -R nonrootuser:nonrootuser /app
 USER nonrootuser
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

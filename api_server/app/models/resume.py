@@ -1,30 +1,20 @@
 from datetime import datetime, timezone
-from typing import List, Optional
 
 from bson import ObjectId
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class ResumeAnalysis(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     # Analysis of the resume
     # Intent agent
     target_role: str
     seniority_level: str
     industry: str
-    priority_goals: List[str]
-    focus_areas: List[str]
-    top_keywords: List[str]
-    optimization_strategy: dict
+    top_keywords: list[str]
     # Analyzer agent
-    sections: List[str]
-    years_exp: int
-    emails: List[str]
-    phone_numbers: List[str]
-    hard_skills: List[str]
-    soft_skills: List[str]
-    missing_hard_skills: Optional[List[str]]
-    matching_hard_skills_score: Optional[float]
-    missing_soft_skills: Optional[List[str]]
-    matching_soft_skills_score: Optional[float]
+    hard_skills: list[str]
+    soft_skills: list[str]
     # ATS agent
     resume_score: float
     section_score: float
@@ -32,32 +22,32 @@ class ResumeAnalysis(BaseModel):
     skills_quality_score: float
     summary_quality_score: float
     formatting_score: float
-    ats_score: Optional[float]
-    hard_skills_score: Optional[float]
-    soft_skills_score: Optional[float]
+    ats_score: float | None
+    hard_skills_score: float | None
+    soft_skills_score: float | None
     # Optimizer agent
-    optimized_resume: str
-    optimized_sections: dict
-    keywords_integrated: List[str]
-    changes_made: List[str]
-    suggested_additions_if_true: List[str]
-    optimization_notes: str
+    section_order: list[str] = Field(default_factory=list)
+    optimized_sections: dict | None = None
+    keywords_integrated: list[str] = Field(default_factory=list)
+    changes_made: list[str] = Field(default_factory=list)
+    suggested_additions_if_true: list[str] = Field(default_factory=list)
+    optimization_notes: str = ""
     # Finalizer agent
     summary: str
     skills_feedback: str
     experience_feedback: str
     structure_feedback: str
-    simple_suggestions: List[str]
+    simple_suggestions: list[str]
     # Premium finalizer extras (empty/default for free tier)
-    strength_highlights: List[str] = Field(default_factory=list)
-    growth_opportunities: List[str] = Field(default_factory=list)
+    strength_highlights: list[str] = Field(default_factory=list)
+    growth_opportunities: list[str] = Field(default_factory=list)
     jd_fit_analysis: str = ""
     certifications_feedback: str = ""
     languages_feedback: str = ""
     professional_links_feedback: str = ""
     optimizer_review: str = ""
-    interview_talking_points: List[str] = Field(default_factory=list)
-    priority_action_plan: List[str] = Field(default_factory=list)
+    interview_talking_points: list[str] = Field(default_factory=list)
+    priority_action_plan: list[str] = Field(default_factory=list)
     recruiter_lens: str = ""
     competitive_positioning: str = ""
 
@@ -72,8 +62,9 @@ class Resume(BaseModel):
     resume_id: str
     version: int = 1
     filename: str
-    storage_path: Optional[str] = None
-    content_sha256: Optional[str] = None
+    storage_path: str | None = None
+    content_sha256: str | None = None
+    updated_with_optimizer: bool = Field(default=False)
     analysis: ResumeAnalysis
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
