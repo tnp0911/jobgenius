@@ -9,4 +9,18 @@ keywords: resume analyzer, job recommender system, future career
 version: 1.0.0
 repository-code: https://github.com/Currybon30/jobgenius
 license: MIT
-date-released: TBD Release Date
+date-released: TBD
+
+# --- References external resources ---
+references:
+  - type: software
+    title: "Awesome-CV"
+    authors:
+      - family-names: "Chen"
+        given-names: "posquit0"
+    url: "https://github.com/posquit0/Awesome-CV"
+    license: "LPPL-1.3c"
+    abstract: >-
+      Referenced Awesome-CV as the foundation for the resume generation
+      component. Its source code and templates were adapted, modified,
+      and integrated into the JobGenius project.
