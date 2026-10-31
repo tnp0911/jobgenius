@@ -15,6 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
 COPY --from=builder /app/.venv /app/.venv
+COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY app ./app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
