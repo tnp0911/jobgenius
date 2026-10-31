@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from app.db.arq import get_arq_pool
 from app.db.redis import get_redis_client
 from app.helpers.auth_helper import is_premium_user
 from app.helpers.limit_helper import increment_monthly_usage
+from app.helpers.resume_helper import format_analyzer_result
 from app.schemas.user import UserResponse
 from app.services.resume_analyzer import convert_file_to_bytes, extract_text_from_resume
 from app.services.resume_service import (
@@ -21,6 +23,7 @@ from app.services.resume_service import (
 from app.services.user_service import get_current_user
 from fastapi import (
     APIRouter,
+    Body,
     Cookie,
     Depends,
     File,
@@ -45,6 +48,44 @@ PREMIUM_ANALYZER_RESET_WINDOW = 60 * 60 * 24 * 1  # 1 day
 JOB_FINDER_RESET_WINDOW = 60 * 60 * 24 * 3  # 3 days
 
 
+async def _load_owned_completed_result(job_id: str, user_id: int) -> str:
+    redis_client = get_redis_client()
+    progress_key = f"resume_analysis:{job_id}:progress"
+    progress = await redis_client.hgetall(progress_key)  # type: ignore
+
+    if not progress:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis job not found.",
+        )
+
+    if str(progress.get("current_user_id")) != str(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this analysis.",
+        )
+
+    job_status = progress.get("status")
+    if job_status != "COMPLETED":
+        if job_status == "FAILED":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Analysis job failed.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Analysis job is not completed yet.",
+        )
+
+    result_json = await redis_client.get(f"resume_analysis:{job_id}:result")
+    if not result_json:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis result not found or has expired.",
+        )
+    return result_json
+
+
 @router.post("/api/resume/analyze")
 async def analyze_resume_free_tier_route(
     request: Request,
@@ -64,7 +105,7 @@ async def analyze_resume_free_tier_route(
                 if usage and int(usage) > ANALYZER_LIMIT:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"You have reached the maximum number of resume analyses for free tier. Please try again in {FREE_ANALYZER_RESET_WINDOW} days.",
+                        detail="You have reached the maximum number of resume analyses for free tier.",
                     )
         resume_bytes = await convert_file_to_bytes(resume_pdf)
         resume_filename = resume_pdf.filename
@@ -85,19 +126,14 @@ async def analyze_resume_free_tier_route(
             "feedback": {},
         }
         result = await free_tier_analyzer.ainvoke(state)
-        content = {
-            "intent": result["intent"],
-            "analyzer": result["analyzer"],
-            "ats": result["ats"],
-            "feedback": result["feedback"],
-        }
+        returned_result = format_analyzer_result(result)
         if anonymous_uuid:
             await increment_monthly_usage(anonymous_uuid)
         if current_user_id:
             count = await redis_client.incr(usage_key)
             if count == 1:
                 await redis_client.expire(usage_key, FREE_ANALYZER_RESET_WINDOW)
-        return JSONResponse(content=content, status_code=status.HTTP_200_OK)
+        return JSONResponse(content=returned_result, status_code=status.HTTP_200_OK)
     except HTTPException:
         raise
     except ValueError as e:
@@ -153,7 +189,7 @@ async def analyze_resume_premium_route(
         if usage and int(usage) > ANALYZER_LIMIT:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You have reached the maximum number of resume analyses for today. Please try again in {PREMIUM_ANALYZER_RESET_WINDOW} days.",
+                detail="You have reached the maximum number of resume analyses for today.",
             )
         arq_pool = get_arq_pool()
         job_id = str(uuid4())
@@ -165,7 +201,7 @@ async def analyze_resume_premium_route(
             )
             job_finder_usage = await redis_client.get(job_finder_usage_key)
             if job_finder_usage and int(job_finder_usage) > JOB_FINDER_LIMIT:
-                message = f"You have reached the maximum number of job finder calls for {JOB_FINDER_RESET_WINDOW} days. We will disable the job finder feature for you in this session. Please try again in {JOB_FINDER_RESET_WINDOW} days."
+                message = "You have reached the maximum number of job finder calls."
                 includes_job_finder = False
 
         resume_bytes = await convert_file_to_bytes(resume_pdf)
@@ -227,11 +263,17 @@ async def get_resume_analysis_progress(
         UserResponse | None,
         Depends(get_current_user),
     ],
+    is_premium: Annotated[bool, Depends(is_premium_user)] = False,
 ):
     if not current_user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized: User must be logged in to access.",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized: User must be logged in to access.",
+            )
+    if not is_premium:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action is only available to PREMIUM users.",
         )
 
     # Initialize redis for pubsub where socket_time is None for SSE connection
@@ -316,44 +358,7 @@ async def get_resume_analysis_result(
             detail="Unauthorized: User must be logged in to access.",
         )
 
-    redis_client = get_redis_client()
-
-    progress_key = f"resume_analysis:{job_id}:progress"
-    progress = await redis_client.hgetall(progress_key)  # type: ignore
-
-    if not progress:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Analysis job not found.",
-        )
-
-    if str(progress.get("current_user_id")) != str(current_user.uid):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this analysis.",
-        )
-
-    job_status = progress.get("status")
-    if job_status != "COMPLETED":
-        if job_status == "FAILED":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Analysis job failed.",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Analysis job is not completed yet.",
-        )
-
-    result_key = f"resume_analysis:{job_id}:result"
-    result_json = await redis_client.get(result_key)
-
-    if not result_json:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Analysis result not found or has expired.",
-        )
-
+    result_json = await _load_owned_completed_result(job_id, current_user.uid)
     return JSONResponse(content=json.loads(result_json), status_code=status.HTTP_200_OK)
 
 
@@ -422,4 +427,60 @@ async def delete_resume(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_SERVER_ERROR: An error occurred while deleting the resume. Please try again later.",
+        )
+
+
+@router.post("/api/resume/rerender/{job_id}")
+async def rerender_resume(
+    job_id: str,
+    resume_full_filename: Annotated[str, Body(min_length=1)],
+    version: Annotated[int, Body(ge=1)],
+    is_premium: Annotated[bool, Depends(is_premium_user)] = False,
+    current_user: Annotated[UserResponse | None, Depends(get_current_user)] = None,
+):
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: User must be logged in to access.",
+        )
+    if not is_premium:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action is only available to PREMIUM users.",
+        )
+    filename = resume_full_filename.strip()
+    if not filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="resume_full_filename is required.",
+        )
+    try:
+        await _load_owned_completed_result(job_id, current_user.uid)
+        resume_id = f"{current_user.uid}_{Path(filename).stem}"
+        await get_resume_by_id_and_version_from_mongodb(
+            current_user.uid, resume_id, version
+        )
+        arq_pool = get_arq_pool()
+        await arq_pool.enqueue_job(
+            "rerender_resume_premium_arq",
+            job_id,
+            current_user.uid,
+            filename,
+            version,
+        )
+        return JSONResponse(
+            content={
+                "job_id": job_id,
+                "message": "Resume keep/rerender job queued. This does not use the analyze progress stream.",
+                "status": "QUEUED",
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rerendering resume: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_SERVER_ERROR: An error occurred while rerendering the resume. Please try again later.",
         )

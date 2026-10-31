@@ -1,4 +1,4 @@
-from app.services.job_service import mcp as job_service_mcp
+from app.ai_agents.tools.job_search_tool import mcp as job_search_tool_mcp
 
 if __name__ == "__main__":
-    job_service_mcp.run(transport="stdio")
+    job_search_tool_mcp.run(transport="stdio")

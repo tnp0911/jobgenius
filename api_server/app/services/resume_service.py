@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.core.config import settings
@@ -11,15 +12,33 @@ from app.models.resume import Resume, ResumeAnalysis, ResumeForJobRecommendation
 from botocore.exceptions import ClientError
 from bson import ObjectId
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+def _analysis_from_mongo(raw: object) -> dict:
+    payload = raw if isinstance(raw, dict) else {}
+    try:
+        return ResumeAnalysis.model_validate(payload).model_dump(mode="json")
+    except ValidationError:
+        payload = {
+            **payload,
+            "section_order": payload.get("section_order") or [],
+            "optimized_sections": payload.get("optimized_sections"),
+            "keywords_integrated": payload.get("keywords_integrated") or [],
+            "changes_made": payload.get("changes_made") or [],
+            "suggested_additions_if_true": payload.get("suggested_additions_if_true") or [],
+            "optimization_notes": payload.get("optimization_notes") or "",
+        }
+        return ResumeAnalysis.model_validate(payload).model_dump(mode="json")
 
 
 def _pdf_sha256(pdf_bytes: bytes) -> str:
     return hashlib.sha256(pdf_bytes).hexdigest()
 
 
-def _read_s3_object_bytes(s3_client, key: str) -> bytes | None:
+def read_s3_object_bytes(s3_client, key: str) -> bytes | None:
     try:
         obj = s3_client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
         body = obj.get("Body")
@@ -42,7 +61,7 @@ async def _is_same_pdf(
         return False
 
     existing_bytes = await asyncio.to_thread(
-        _read_s3_object_bytes, s3_client, storage_path
+        read_s3_object_bytes, s3_client, storage_path
     )
     if existing_bytes is None:
         return False
@@ -55,9 +74,39 @@ def _resume_to_mongo(resume: Resume) -> dict:
     return document
 
 
+async def _upsert_job_recommendation(
+    collection,
+    user_id: int,
+    resume_id: str,
+    version: int,
+    full_combined_text: str,
+) -> None:
+    existing_recommendation = await collection.find_one({"resume_id": resume_id})
+    if existing_recommendation is None:
+        recommendation = ResumeForJobRecommendation(
+            user_id=user_id,
+            resume_id=resume_id,
+            version=version,
+            full_combined_text=full_combined_text,
+        )
+        await collection.insert_one(recommendation.model_dump(mode="json"))
+        return
+
+    await collection.update_one(
+        {"resume_id": resume_id},
+        {
+            "$set": {
+                "user_id": user_id,
+                "full_combined_text": full_combined_text,
+                "version": version,
+            }
+        },
+    )
+
+
 async def store_resume_to_mongodb(
-    user_id: int, resume_filename: str, pdf_bytes: bytes, analyzed_result: dict
-):
+    user_id: int, resume_filename: str, resume_text: str, pdf_bytes: bytes, analyzed_result: dict
+) -> int | None:
     try:
         s3_client = await get_s3_client()
         mongo_client = get_mongo_client()
@@ -69,7 +118,7 @@ async def store_resume_to_mongodb(
 
         extracted_filename = Path(resume_filename).stem
         formatted_result = format_analyzer_result(analyzed_result)
-        full_combined_text = analyzer_result_to_text(analyzed_result)
+        full_combined_text = analyzer_result_to_text(resume_text, analyzed_result)
         resume_id_generator = f"{user_id}_{extracted_filename}"
 
         existing_resume = await resume_collection.find_one(
@@ -80,12 +129,30 @@ async def store_resume_to_mongodb(
         if existing_resume and await _is_same_pdf(
             s3_client, existing_resume, pdf_bytes, digest
         ):
+            current_version = existing_resume["version"]
             logger.info(
-                "Skip store: same PDF for resume_id=%s version=%s",
+                "Same PDF: update analysis for resume_id=%s version=%s",
                 resume_id_generator,
-                existing_resume.get("version"),
+                current_version,
             )
-            return True
+            await resume_collection.update_one(
+                {"_id": existing_resume["_id"]},
+                {
+                    "$set": {
+                        "analysis": formatted_result,
+                        "updated_at": datetime.now(timezone.utc),
+                        "content_sha256": digest,
+                    }
+                },
+            )
+            await _upsert_job_recommendation(
+                resume_for_job_recommendation_collection,
+                user_id,
+                resume_id_generator,
+                current_version,
+                full_combined_text,
+            )
+            return current_version
 
         next_version = (existing_resume["version"] + 1) if existing_resume else 1
         storage_key = f"{user_id}/{extracted_filename}_{next_version}.pdf"
@@ -110,38 +177,18 @@ async def store_resume_to_mongodb(
             analysis=formatted_result,
         )
         await resume_collection.insert_one(_resume_to_mongo(new_resume))
-
-        existing_recommendation = (
-            await resume_for_job_recommendation_collection.find_one(
-                {"resume_id": resume_id_generator}
-            )
+        await _upsert_job_recommendation(
+            resume_for_job_recommendation_collection,
+            user_id,
+            resume_id_generator,
+            next_version,
+            full_combined_text,
         )
-        if existing_recommendation is None:
-            recommendation = ResumeForJobRecommendation(
-                user_id=user_id,
-                resume_id=resume_id_generator,
-                version=next_version,
-                full_combined_text=full_combined_text,
-            )
-            await resume_for_job_recommendation_collection.insert_one(
-                recommendation.model_dump(mode="json")
-            )
-        else:
-            await resume_for_job_recommendation_collection.update_one(
-                {"resume_id": resume_id_generator},
-                {
-                    "$set": {
-                        "user_id": user_id,
-                        "full_combined_text": full_combined_text,
-                        "version": next_version,
-                    }
-                },
-            )
 
-        return True
+        return next_version
     except Exception as e:
         logger.error(f"Error storing resume to MongoDB: {e}")
-        return False
+        return None
 
 
 async def get_resumes_from_mongodb(user_id: int):
@@ -186,15 +233,14 @@ async def get_resume_by_id_and_version_from_mongodb(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Resume {resume_id} version {version} of user {user_id} not found. Please run premium analysis first.",
             )
-        analysis = ResumeAnalysis.model_validate(response["analysis"])
         return {
             "resume_id": response["resume_id"],
             "version": response["version"],
             "filename": response["filename"],
             "storage_path": f"localhost:4566/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
-            "analysis": analysis.model_dump(mode="json"),
+            "analysis": _analysis_from_mongo(response.get("analysis")),
         }
-    except ValueError:
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting resume by id and version from MongoDB: {e}")
@@ -372,3 +418,48 @@ async def resolve_resume_id_for_recommendations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_SERVER_ERROR: An error occurred while resolving the resume id for recommendations. Please try again later.",
         )
+
+
+async def overwrite_resume_in_s3(
+    s3_client, user_id: int, filename: str, version: int, pdf_bytes: bytes, full_combined_text: str
+):
+    try:
+        await asyncio.to_thread(
+            s3_client.put_object,
+            Bucket=settings.S3_BUCKET_NAME,
+            Key=f"{user_id}/{filename}_{version}.pdf", 
+            Body=pdf_bytes,
+            ContentType="application/pdf",
+            ContentDisposition="inline",
+        )
+
+        mongo_client = get_mongo_client()
+        mongo_db = mongo_client[settings.MONGODB_NAME]
+        resume_collection = mongo_db["resumes"]
+        resume_for_job_recommendation_collection = mongo_db[
+            "resume_for_job_recommendation"
+        ]
+        resume_id_generator = f"{user_id}_{filename}"
+        digest = _pdf_sha256(pdf_bytes)
+        await resume_collection.update_one(
+            {"resume_id": resume_id_generator, "version": version},
+            {"$set": {
+                "content_sha256": digest,
+                "updated_with_optimizer": True,
+                "updated_at": datetime.now(timezone.utc),
+            }},
+        )
+        await _upsert_job_recommendation(
+            resume_for_job_recommendation_collection,
+            user_id,
+            resume_id_generator,
+            version,
+            full_combined_text,
+        )
+    except Exception as e:
+        logger.error(f"Error at overwrite_resume_in_s3: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_SERVER_ERROR: An error occurred while overwriting the resume in S3. Please try again later.",
+        )
+
