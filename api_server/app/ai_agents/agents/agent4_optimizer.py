@@ -163,48 +163,48 @@ def _filter_other_sections(others: Any, resume_norm: str) -> list:
     return grounded
 
 
-# def ground_optimizer_output(parsed: dict, resume_text: str) -> dict:
-#     """Drop invented employers, schools, projects, skills, and certs."""
-#     if not isinstance(parsed, dict) or parsed.get("error"):
-#         return parsed
+def ground_optimizer_output(parsed: dict, resume_text: str) -> dict:
+    """Drop invented employers, schools, projects, skills, and certs."""
+    if not isinstance(parsed, dict) or parsed.get("error"):
+        return parsed
 
-#     sections = parsed.get("optimized_sections")
-#     if not isinstance(sections, dict):
-#         return parsed
+    sections = parsed.get("optimized_sections")
+    if not isinstance(sections, dict):
+        return parsed
 
-#     resume_norm = _normalize_for_match(resume_text)
-#     before = json.dumps(sections, sort_keys=True, default=str)
+    resume_norm = _normalize_for_match(resume_text)
+    before = json.dumps(sections, sort_keys=True, default=str)
 
-#     sections["skills"] = _filter_skill_groups(sections.get("skills"), resume_norm)
-#     sections["experience"] = _filter_named_entries(
-#         sections.get("experience"), "company", resume_norm, "title"
-#     )
-#     sections["projects"] = _filter_named_entries(
-#         sections.get("projects"), "project_title", resume_norm
-#     )
-#     sections["education"] = _filter_named_entries(
-#         sections.get("education"), "school", resume_norm, "degree"
-#     )
-#     sections["other"] = _filter_other_sections(sections.get("other"), resume_norm)
+    sections["skills"] = _filter_skill_groups(sections.get("skills"), resume_norm)
+    sections["experience"] = _filter_named_entries(
+        sections.get("experience"), "company", resume_norm, "title"
+    )
+    sections["projects"] = _filter_named_entries(
+        sections.get("projects"), "project_title", resume_norm
+    )
+    sections["education"] = _filter_named_entries(
+        sections.get("education"), "school", resume_norm, "degree"
+    )
+    sections["other"] = _filter_other_sections(sections.get("other"), resume_norm)
 
-#     keywords = parsed.get("keywords_integrated")
-#     if isinstance(keywords, list):
-#         parsed["keywords_integrated"] = [
-#             keyword
-#             for keyword in keywords
-#             if isinstance(keyword, str) and _is_grounded(keyword, resume_norm)
-#         ]
+    keywords = parsed.get("keywords_integrated")
+    if isinstance(keywords, list):
+        parsed["keywords_integrated"] = [
+            keyword
+            for keyword in keywords
+            if isinstance(keyword, str) and _is_grounded(keyword, resume_norm)
+        ]
 
-#     parsed["optimized_sections"] = sections
-#     after = json.dumps(sections, sort_keys=True, default=str)
-#     if before != after:
-#         notes = parsed.get("optimization_notes") or ""
-#         suffix = "Removed entries that were not supported by the original resume."
-#         if suffix not in notes:
-#             parsed["optimization_notes"] = f"{notes} {suffix}".strip()
-#         logger.warning("Agent 4: stripped unsupported invented optimizer entries")
+    parsed["optimized_sections"] = sections
+    after = json.dumps(sections, sort_keys=True, default=str)
+    if before != after:
+        notes = parsed.get("optimization_notes") or ""
+        suffix = "Removed entries that were not supported by the original resume."
+        if suffix not in notes:
+            parsed["optimization_notes"] = f"{notes} {suffix}".strip()
+        logger.warning("Agent 4: stripped unsupported invented optimizer entries")
 
-#     return parsed
+    return parsed
 
 
 async def optimizer_agent(
@@ -304,5 +304,4 @@ async def optimizer_agent(
         logger.info("Agent 4: Optimizer agent response received")
 
     parsed = safe_parse_optimizer(response, "optimizer_agent")
-    return parsed
-    # return ground_optimizer_output(parsed, resume_text)
+    return ground_optimizer_output(parsed, resume_text)
