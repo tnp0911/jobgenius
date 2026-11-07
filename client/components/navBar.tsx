@@ -196,11 +196,6 @@ export function NavBar() {
             >
               Logout
             </button>
-            <div
-              className="site-version"
-            >
-              <p>v4.1.0</p>
-            </div>
           </div>
         </div>
       );
