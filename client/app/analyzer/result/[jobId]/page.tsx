@@ -27,7 +27,7 @@ export default function AnalyzerResultPage() {
       </header>
 
       <section className="analyzer-stage" aria-label="Analysis results">
-        <div className="mkt-shell analyzer-stage-inner">
+        <div className="mkt-shell analyzer-stage-inner analyzer-stage-inner-wide">
           <ResultWorkspace />
         </div>
       </section>

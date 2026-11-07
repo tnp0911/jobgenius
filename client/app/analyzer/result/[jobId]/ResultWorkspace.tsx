@@ -21,14 +21,18 @@ export function ResultWorkspace() {
     }
     const fetchResult = async () => {
       try {
-        const result = await premiumAnalyzeResumeResult(jobId);
-        setResult(result);
-      } catch (error) {
+        const next = await premiumAnalyzeResumeResult(jobId);
+        if (!next) {
+          setMissing(true);
+          return;
+        }
+        setResult(next);
+      } catch {
         setMissing(true);
       }
     };
     fetchResult();
-  }, [jobId, setMissing, setResult]);
+  }, [jobId]);
 
   if (missing) {
     return (
@@ -57,6 +61,7 @@ export function ResultWorkspace() {
   return (
     <AnalyzerResults
       result={result}
+      jobId={jobId}
       onAnalyzeAgain={() => {
         router.replace("/analyzer");
       }}

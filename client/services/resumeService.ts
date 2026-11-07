@@ -46,6 +46,12 @@ export type PremiumAnalyzeJobResponse = {
   progress: number;
 }
 
+export type PremiumAnalyzeRerender = {
+  pdf_base64?: string;
+  tex?: string;
+  [key: string]: unknown;
+};
+
 export type PremiumAnalyzeResult = {
   intent: Record<string, unknown>;
   analyzer: Record<string, unknown>;
@@ -53,6 +59,7 @@ export type PremiumAnalyzeResult = {
   optimizer: Record<string, unknown>;
   feedback: Record<string, unknown> | string;
   job_finder: Record<string, unknown> | string | null | unknown;
+  rerender?: PremiumAnalyzeRerender | null;
 };
 
 export async function premiumAnalyzeResumeRequest(
