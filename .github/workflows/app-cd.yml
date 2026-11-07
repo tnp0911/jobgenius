@@ -1,0 +1,115 @@
+name: Docker Publish to Docker Hub and GHCR
+
+on:
+  workflow_run:
+    workflows:
+      - FastAPI CI Pipeline
+      - Spring CI Pipeline
+    types:
+      - completed
+    branches:
+      - main
+
+# Define permissions for the workflow (only allow read access to contents and actions)
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+jobs:
+  docker-publish-fastapi:
+    name: Docker Publish FastAPI
+    runs-on: ubuntu-latest
+
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'FastAPI CI Pipeline' &&
+      github.event.workflow_run.head_branch == 'main'
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Extract metadata for Docker
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ vars.DOCKERHUB_USERNAME }}/jobgenius-fastapi
+            ghcr.io/${{ vars.DOCKERHUB_USERNAME }}/jobgenius-fastapi
+          tags: |
+            type=raw,value=latest
+
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push Docker image for API Server
+        uses: docker/build-push-action@v7
+        with:
+          context: ./api_server
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+  
+  docker-publish-spring:
+    name: Docker Publish Spring
+    runs-on: ubuntu-latest
+
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'Spring CI Pipeline' &&
+      github.event.workflow_run.head_branch == 'main'
+      
+      
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          
+      - name: Extract metadata for Docker
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ vars.DOCKERHUB_USERNAME }}/jobgenius-spring
+            ghcr.io/${{ vars.DOCKERHUB_USERNAME }}/jobgenius-spring
+          tags: |
+            type=raw,value=latest
+      
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Sign in to GHCR
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        
+      - name: Build and push Docker image for Auth Server
+        uses: docker/build-push-action@v7
+        with:
+          context: ./auth_server
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
