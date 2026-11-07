@@ -20,4 +20,5 @@ async def update_progress(
             progress_key,
             mapping={"status": status, "progress": progress},
         )
+        await redis.expire(progress_key, 60 * 60 * 24) # 24 hours
         await redis.publish(progress_key, json.dumps(event))
