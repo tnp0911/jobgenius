@@ -144,8 +144,8 @@ JobGenius acts as a sharp, impartial career mentor. Upload your resume (and opti
   <img width="1000" alt="JobGenius Waiting for Analysis" src="https://github.com/user-attachments/assets/051865e0-11ff-4123-83f9-e7bbff6a1e80" />
   <p><em>Processing — the multi-agent AI pipeline parses, scores, and coaches in real time</em></p>
 
-  <img width="1000" alt="JobGenius Analysis Results" src="https://github.com/user-attachments/assets/1452cb2f-1047-445e-9248-1ef66179349c" />
-  <p><em>Results dashboard — ATS score breakdown, skill gap analysis, and actionable coaching tips at a glance</em></p>
+  <img width="1000" alt="JobGenius Premium Analysis Result Page" src="https://github.com/user-attachments/assets/d22d4250-636b-433d-8663-aea528ba57be" />
+  <p><em>Results dashboard (PREMIUM) — ATS score breakdown, skill gap analysis, optimized resume preview, and actionable coaching tips at a glance</em></p>
 
 </div>
 
