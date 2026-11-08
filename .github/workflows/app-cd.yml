@@ -38,7 +38,7 @@ jobs:
         with:
           images: |
             ${{ vars.DOCKERHUB_USERNAME }}/jobgenius-fastapi
-            ghcr.io/${{ vars.DOCKERHUB_USERNAME }}/jobgenius-fastapi
+            ghcr.io/${{ vars.GHCR_USERNAME }}/jobgenius-fastapi
           tags: |
             type=raw,value=latest
 
