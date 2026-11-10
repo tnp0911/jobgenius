@@ -9,6 +9,12 @@ from app.ai_agents.free_tier_multiagents import build_free_tier_graph
 from app.auth.dependencies import get_current_user_id
 from app.db.arq import get_arq_pool
 from app.db.redis import get_redis_client
+from app.helpers.arq_helper import (
+    list_pending_analyses,
+    refund_usage,
+    remove_key_from_redis,
+    remove_pending_analysis,
+)
 from app.helpers.auth_helper import is_premium_user
 from app.helpers.limit_helper import increment_monthly_usage
 from app.helpers.resume_helper import format_analyzer_result
@@ -49,6 +55,9 @@ JOB_FINDER_RESET_WINDOW = 60 * 60 * 24 * 3  # 3 days
 
 
 async def _load_owned_completed_result(job_id: str, user_id: int) -> str:
+    """
+    This function checks if the analysis job is completed and owned by the user, and returns the result if so.
+    """
     redis_client = get_redis_client()
     progress_key = f"resume_analysis:{job_id}:progress"
     progress = await redis_client.hgetall(progress_key)  # type: ignore
@@ -94,20 +103,38 @@ async def analyze_resume_free_tier_route(
     user_goal: Annotated[str, Form()] = "",  # optional
     anonymous_uuid: Annotated[str | None, Cookie()] = None,
 ):
+    free_usage_reserved = False
+    anonymous_usage_reserved = False
+    free_usage_key = ""
+    anonymous_usage_key = ""
     try:
-        current_user_id = None
         if request.cookies.get("access_token"):
             current_user_id = get_current_user_id(request)
             if current_user_id:
                 redis_client = get_redis_client()
-                usage_key = f"free_resume_analyzer_usage:{current_user_id}"
-                usage = await redis_client.get(usage_key)
+                free_usage_key = f"free_resume_analyzer_usage:{current_user_id}"
+                usage = await redis_client.incr(free_usage_key)
+                if usage == 1:
+                    await redis_client.expire(
+                        free_usage_key, FREE_ANALYZER_RESET_WINDOW
+                    )
                 if usage and int(usage) > ANALYZER_LIMIT:
+                    await refund_usage(free_usage_key)
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="You have reached the maximum number of resume analyses for free tier.",
                     )
+                free_usage_reserved = True
+        if anonymous_uuid:
+            anonymous_usage_key = f"usage:{anonymous_uuid}"
+            await increment_monthly_usage(anonymous_uuid)
+            anonymous_usage_reserved = True
         resume_bytes = await convert_file_to_bytes(resume_pdf)
+        if not resume_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File is empty.",
+            )
         resume_filename = resume_pdf.filename
         if not resume_filename:
             raise HTTPException(
@@ -127,19 +154,25 @@ async def analyze_resume_free_tier_route(
         }
         result = await free_tier_analyzer.ainvoke(state)
         returned_result = format_analyzer_result(result)
-        if anonymous_uuid:
-            await increment_monthly_usage(anonymous_uuid)
-        if current_user_id:
-            count = await redis_client.incr(usage_key)
-            if count == 1:
-                await redis_client.expire(usage_key, FREE_ANALYZER_RESET_WINDOW)
         return JSONResponse(content=returned_result, status_code=status.HTTP_200_OK)
     except HTTPException:
+        if free_usage_reserved:
+            await refund_usage(free_usage_key)
+        if anonymous_usage_reserved:
+            await refund_usage(anonymous_usage_key)
         raise
     except ValueError as e:
+        if free_usage_reserved:
+            await refund_usage(free_usage_key)
+        if anonymous_usage_reserved:
+            await refund_usage(anonymous_usage_key)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Error analyzing resume: {e}")
+        if free_usage_reserved:
+            await refund_usage(free_usage_key)
+        if anonymous_usage_reserved:
+            await refund_usage(anonymous_usage_key)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_SERVER_ERROR: An error occurred while analyzing the resume. Please try again later.",
@@ -181,28 +214,42 @@ async def analyze_resume_premium_route(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This action is only available to PREMIUM users.",
         )
+    analyzer_reserved = False
+    job_finder_reserved = False
+    usage_key = ""
+    job_finder_usage_key = ""
     try:
         current_user_id = current_user.uid if current_user else None
         redis_client = get_redis_client()
         usage_key = f"premium_resume_analyzer_usage:{current_user_id}"
-        usage = await redis_client.get(usage_key)
+        usage = await redis_client.incr(usage_key)
+        if usage == 1:
+            await redis_client.expire(usage_key, PREMIUM_ANALYZER_RESET_WINDOW)
         if usage and int(usage) > ANALYZER_LIMIT:
+            await refund_usage(usage_key)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You have reached the maximum number of resume analyses for today.",
             )
+        analyzer_reserved = True
+
         arq_pool = get_arq_pool()
         job_id = str(uuid4())
         message = ""
-        job_finder_usage_key = ""
         if includes_job_finder:
             job_finder_usage_key = (
                 f"job_search_with_prompt_premium_limit:{current_user_id}"
             )
-            job_finder_usage = await redis_client.get(job_finder_usage_key)
+            job_finder_usage = await redis_client.incr(job_finder_usage_key)
+            if job_finder_usage == 1:
+                await redis_client.expire(job_finder_usage_key, JOB_FINDER_RESET_WINDOW)
             if job_finder_usage and int(job_finder_usage) > JOB_FINDER_LIMIT:
-                message = "You have reached the maximum number of job finder calls."
+                await refund_usage(job_finder_usage_key)
+                job_finder_usage_key = ""
                 includes_job_finder = False
+                message = "You have reached the maximum number of job finder calls."
+            else:
+                job_finder_reserved = True
 
         resume_bytes = await convert_file_to_bytes(resume_pdf)
         if not resume_bytes:
@@ -245,10 +292,22 @@ async def analyze_resume_premium_route(
         }
         return JSONResponse(content=content, status_code=status.HTTP_200_OK)
     except HTTPException:
+        if analyzer_reserved:
+            await refund_usage(usage_key)
+        if job_finder_reserved:
+            await refund_usage(job_finder_usage_key)
         raise
     except ValueError as e:
+        if analyzer_reserved:
+            await refund_usage(usage_key)
+        if job_finder_reserved:
+            await refund_usage(job_finder_usage_key)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        if analyzer_reserved:
+            await refund_usage(usage_key)
+        if job_finder_reserved:
+            await refund_usage(job_finder_usage_key)
         logger.error(f"Error analyzing resume: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -267,9 +326,9 @@ async def get_resume_analysis_progress(
 ):
     if not current_user:
         raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized: User must be logged in to access.",
-            )
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: User must be logged in to access.",
+        )
     if not is_premium:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -360,6 +419,37 @@ async def get_resume_analysis_result(
 
     result_json = await _load_owned_completed_result(job_id, current_user.uid)
     return JSONResponse(content=json.loads(result_json), status_code=status.HTTP_200_OK)
+
+
+@router.get("/api/resume/analyze/pending")
+async def get_pending_resume_analyses(
+    current_user: Annotated[UserResponse | None, Depends(get_current_user)],
+    is_premium: Annotated[bool, Depends(is_premium_user)] = False,
+):
+    """
+    List completed analysis jobs the user still needs to accept/reject.
+    Pending pointers live for 24 hours alongside the Redis result payload.
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: User must be logged in to access.",
+        )
+    if not is_premium:
+        return JSONResponse(content={"pending": []}, status_code=status.HTTP_200_OK)
+
+    try:
+        pending = await list_pending_analyses(current_user.uid)
+        return JSONResponse(
+            content={"pending": pending},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        logger.error(f"Error getting pending resume analyses: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_SERVER_ERROR: An error occurred while getting pending analyses. Please try again later.",
+        )
 
 
 @router.get("/api/resumes")
@@ -468,10 +558,12 @@ async def rerender_resume(
             filename,
             version,
         )
+        # Hide from pending list immediately; worker also clears after overwrite.
+        await remove_pending_analysis(current_user.uid, job_id)
         return JSONResponse(
             content={
                 "job_id": job_id,
-                "message": "Resume keep/rerender job queued. This does not use the analyze progress stream.",
+                "message": "Resume keep/rerender job queued.",
                 "status": "QUEUED",
             },
             status_code=status.HTTP_200_OK,
@@ -483,4 +575,45 @@ async def rerender_resume(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_SERVER_ERROR: An error occurred while rerendering the resume. Please try again later.",
+        )
+
+
+@router.delete("/api/resume/analyze/result/{job_id}")
+async def delete_resume_analysis_result(
+    job_id: str,
+    is_premium: Annotated[bool, Depends(is_premium_user)] = False,
+    current_user: Annotated[UserResponse | None, Depends(get_current_user)] = None,
+):
+    """
+    Delete the resume analysis result based on the job ID if user rejects the optimized resume
+    """
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized: User must be logged in to access.",
+            )
+        if not is_premium:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This action is only available to PREMIUM users.",
+            )
+        await _load_owned_completed_result(job_id, current_user.uid)
+        await remove_key_from_redis(f"resume_analysis:{job_id}:progress")
+        await remove_key_from_redis(f"resume_analysis:{job_id}:result")
+        await remove_pending_analysis(current_user.uid, job_id)
+        logger.info(f"Resume analysis result deleted successfully for job ID: {job_id}")
+        return JSONResponse(
+            content={
+                "message": "Resume analysis result deleted successfully.",
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting resume analysis result: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_SERVER_ERROR: An error occurred while deleting the resume analysis result. Please try again later.",
         )
