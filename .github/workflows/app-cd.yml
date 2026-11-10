@@ -2,12 +2,12 @@ name: Docker Publish to Docker Hub and GHCR
 
 on:
   workflow_dispatch:
-  # workflow_run:
-  #   workflows:
-  #     - FastAPI CI Pipeline
-  #     - Spring CI Pipeline
-  #   types:
-  #     - completed
+  workflow_run:
+    workflows:
+      - FastAPI CI Pipeline
+      - Spring CI Pipeline
+    types:
+      - completed
   push:
     branches:
       - main
