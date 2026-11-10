@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { handleLoginGauth } from "@/auth/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAborted } from "@/utils/errorHelpers";
+import { notifyPendingAnalysisAfterLogin } from "@/utils/pendingAnalysisNotice";
 
 function parseTotpCode(raw: string): number | null {
   const digits = raw.replace(/\D/g, "");
@@ -54,6 +55,7 @@ export function MfaChallengeForm() {
 
       await refreshAuth();
       toast.success("Login successful");
+      void notifyPendingAnalysisAfterLogin();
       router.push("/");
     } catch (error: unknown) {
       if (isAborted(error) || controller.signal.aborted) return;
