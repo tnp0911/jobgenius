@@ -21,14 +21,18 @@ export function ResultWorkspace() {
     }
     const fetchResult = async () => {
       try {
-        const result = await premiumAnalyzeResumeResult(jobId);
-        setResult(result);
-      } catch (error) {
+        const next = await premiumAnalyzeResumeResult(jobId);
+        if (!next) {
+          setMissing(true);
+          return;
+        }
+        setResult(next);
+      } catch {
         setMissing(true);
       }
     };
     fetchResult();
-  }, [jobId, setMissing, setResult]);
+  }, [jobId]);
 
   if (missing) {
     return (
@@ -36,8 +40,8 @@ export function ResultWorkspace() {
         <p className="analyzer-pane-kicker">Results</p>
         <h2 className="analyzer-pane-title">Results unavailable</h2>
         <p className="analyzer-pane-lead">
-          We could not find the finished analysis in this browser session.
-          Run the analyzer again to generate a new report.
+          This analysis result was not found or has expired. Temporary results
+          are kept for 24 hours. Run the analyzer again to generate a new report.
         </p>
         <Link href="/analyzer" className="mkt-btn mkt-btn-primary">
           Back to analyzer
@@ -57,6 +61,7 @@ export function ResultWorkspace() {
   return (
     <AnalyzerResults
       result={result}
+      jobId={jobId}
       onAnalyzeAgain={() => {
         router.replace("/analyzer");
       }}

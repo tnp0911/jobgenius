@@ -1,0 +1,106 @@
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.confirm-modal {
+  width: min(100%, 28rem);
+  padding: clamp(1.25rem, 3vw, 1.65rem);
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.92) 100%);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+  font-family: var(--font-body, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif);
+}
+
+.confirm-modal-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.confirm-modal-title {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-display, inherit);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.confirm-modal-body {
+  display: grid;
+  gap: 0.75rem;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.confirm-modal-body p {
+  margin: 0;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.35rem;
+}
+
+.confirm-modal-btn {
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.confirm-modal-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.confirm-modal-btn-ghost {
+  background: transparent;
+  border-color: rgba(148, 163, 184, 0.55);
+  color: #334155;
+}
+
+.confirm-modal-btn-ghost:hover:not(:disabled) {
+  background: rgba(241, 245, 249, 0.9);
+}
+
+.confirm-modal-btn-primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.confirm-modal-btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.confirm-modal-btn-danger {
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.confirm-modal-btn-danger:hover:not(:disabled) {
+  background: #991b1b;
+}

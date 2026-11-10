@@ -13,37 +13,58 @@ services:
     env_file:
       - ./api_server/.env
     depends_on:
-      - redis
-      - mongodb
-      - mysql
-      - localstack
-      - pinecone
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      pinecone:
+        condition: service_started
     networks:
       default:
         aliases:
           - api.jobgenius.local
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 1m30s
-      timeout: 30s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
       start_period: 30s
     
   # Service 2: Arq Worker for background tasks
   worker:
+    build:
+      context: ./api_server
+      dockerfile: Dockerfile
     container_name: fastapi-worker
     image: currybon30/jobgenius-fastapi:latest
     command: ["arq", "app.bg_worker.WorkerSettings"]
+    user: "0:0"
     env_file:
       - ./api_server/.env
+    environment:
+      RESUME_RENDER_LATEX_WORKDIR: /latex_work
+      RESUME_RENDER_LATEX_DOCKER_VOLUME: jobgenius_latex_compile
+      RESUME_RENDER_LATEX_IMAGE: resume_render_latex:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - latex_compile:/latex_work
     restart: unless-stopped
     depends_on:
-      - redis
-      - mongodb
-      - mysql
-      - localstack
-      - pinecone
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      pinecone:
+        condition: service_started
 
   # Service 3: Spring API Server
   auth_server:
@@ -57,16 +78,20 @@ services:
     env_file:
       - ./auth_server/.env
     depends_on:
-      - redis
-      - mysql
-      - api_server
-      - mailpit
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      api_server:
+        condition: service_healthy
+      # mailpit:
+      #   condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 1m30s
-      timeout: 30s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
       start_period: 30s
     
   # Service 4: Redis
@@ -195,26 +220,26 @@ services:
     command: listen --api-key ${STRIPE_SECRET_KEY} --forward-to http://auth-server:5000/api/stripe/webhook --skip-update --skip-verify
 
   # Service 10: Ollama
-  # ollama:
-  #   container_name: ollama
-  #   image: ollama/ollama:latest
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ${OLLAMA_DATA_DIR:-./ollama_data}:/root/.ollama
-  #   networks:
-  #     default:
-  #       aliases:
-  #         - ollama.local
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 60s
-  #   restart: unless-stopped
-  #   pull_policy: always # pull the latest image from the registry
-  #   tty: true # enable TTY for interactive mode
+  ollama:
+    container_name: ollama
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ${OLLAMA_DATA_DIR:-./ollama_data}:/root/.ollama
+    networks:
+      default:
+        aliases:
+          - ollama.local
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    pull_policy: always # pull the latest image from the registry
+    tty: true # enable TTY for interactive mode
     
     #* GPU resources for ollama (uncomment if you have a GPU)
     deploy:
@@ -235,7 +260,8 @@ services:
   #   volumes:
   #     - ${OLLAMA_WEBUI_DATA_DIR:-./ollama_webui_data}:/app/data
   #   depends_on:
-  #     - ollama
+  #     ollama:
+  #       condition: service_healthy
   #   env_file:
   #     - ./.env
   #   restart: unless-stopped
@@ -245,23 +271,33 @@ services:
   #         - ollama_webui.local
 
   # Service 12: Mailpit
-  mailpit:
-    container_name: mailpit
-    image: axllent/mailpit:latest
-    restart: unless-stopped
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-    networks:
-      default:
-        aliases:
-          - mailpit.local
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8025/livez"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+  # mailpit:
+  #   container_name: mailpit
+  #   image: axllent/mailpit:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "1025:1025"
+  #     - "8025:8025"
+  #   networks:
+  #     default:
+  #       aliases:
+  #         - mailpit.local
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8025/livez"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+
+  # Service 13: Resume Render LaTeX - (Awesome CV)[https://github.com/posquit0/Awesome-CV]
+  # Build only (not started by `docker compose up`).
+  # Compile with: docker compose build resume_render_latex
+  # then compile_latex.py runs `docker run --rm ... latexmk resume.tex`
+  resume_render_latex:
+    build:
+      context: ./api_server/app/ai_agents/other_resources/resume_render_latex/template
+    image: resume_render_latex:latest
+    profiles: ["latex"]
 
 volumes:
   mongo_data:
@@ -270,3 +306,5 @@ volumes:
   ollama_data:
   ollama_webui_data:
   redis_data:
+  latex_compile:
+    name: jobgenius_latex_compile

@@ -11,6 +11,7 @@ import {
   getResumes,
   type Resume,
 } from "@/services/resumeService";
+import { AnalyzerResults } from "@/app/analyzer/AnalyzerResults";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -26,6 +27,8 @@ type SelectedVersion = {
   resumeId: string;
   storage_path: string;
   version: number;
+  filename: string;
+  updatedWithOptimizer: boolean;
 };
 
 function versionKey(resumeId: string, version: number) {
@@ -58,208 +61,6 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-function asString(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function asStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
-  );
-}
-
-function scorePercent(value: unknown): number | null {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return null;
-  const pct = n <= 1 ? n * 100 : n;
-  return Math.round(Math.min(100, Math.max(0, pct)));
-}
-
-function ScoreChip({ label, value }: { label: string; value: unknown }) {
-  const pct = scorePercent(value);
-  if (pct === null) return null;
-  return (
-    <div className="history-score-chip">
-      <span className="history-score-chip-value">{pct}</span>
-      <span className="history-score-chip-label">{label}</span>
-    </div>
-  );
-}
-
-function TagList({ items }: { items: string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <ul className="history-tag-list">
-      {items.map((item) => (
-        <li key={item} className="history-tag">
-          {item}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function TextBlock({ title, text }: { title: string; text: string }) {
-  if (!text) return null;
-  return (
-    <section className="history-analysis-block">
-      <h4 className="history-analysis-block-title">{title}</h4>
-      <p className="history-analysis-prose">{text}</p>
-    </section>
-  );
-}
-
-function ListBlock({ title, items }: { title: string; items: string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section className="history-analysis-block">
-      <h4 className="history-analysis-block-title">{title}</h4>
-      <ol className="history-analysis-list">
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-function HistoryAnalysis({
-  filename,
-  version,
-  analysis,
-  onClose,
-}: {
-  filename: string;
-  version: number;
-  storage_path: string;
-  analysis: Record<string, unknown>;
-  onClose: () => void;
-}) {
-  const targetRole = asString(analysis.target_role);
-  const seniority = asString(analysis.seniority_level);
-  const industry = asString(analysis.industry);
-  const meta = [seniority, industry].filter(Boolean).join(" · ");
-  const hardSkills = asStringList(analysis.hard_skills);
-  const softSkills = asStringList(analysis.soft_skills);
-  const missingHard = asStringList(analysis.missing_hard_skills);
-  const missingSoft = asStringList(analysis.missing_soft_skills);
-  const keywords = asStringList(analysis.top_keywords);
-  const hasSkillTags =
-    hardSkills.length +
-      softSkills.length +
-      missingHard.length +
-      missingSoft.length +
-      keywords.length >
-    0;
-
-  return (
-    <article className="history-analysis" aria-labelledby="history-analysis-title">
-      <div className="history-analysis-head">
-        <div>
-          <p className="account-pane-kicker">Saved analysis</p>
-          <h3 id="history-analysis-title" className="history-analysis-title">
-            {targetRole || filename}
-          </h3>
-          <p className="history-analysis-meta">
-            Version {version}
-            {meta ? ` · ${meta}` : ""}
-          </p>
-        </div>
-        <button type="button" className="mkt-btn mkt-btn-ghost" onClick={onClose}>
-          Close
-        </button>
-      </div>
-
-      <div className="history-score-row" aria-label="Scores">
-        <ScoreChip label="Resume quality" value={analysis.resume_score} />
-        <ScoreChip label="ATS fit" value={analysis.ats_score} />
-        <ScoreChip label="Sections" value={analysis.section_score} />
-        <ScoreChip label="Skills quality" value={analysis.skills_quality_score} />
-        <ScoreChip
-          label="Hard skills match"
-          value={analysis.matching_hard_skills_score}
-        />
-        <ScoreChip
-          label="Soft skills match"
-          value={analysis.matching_soft_skills_score}
-        />
-      </div>
-
-      <TextBlock title="Summary" text={asString(analysis.summary)} />
-
-      <div className="history-analysis-grid">
-        <TextBlock title="Skills" text={asString(analysis.skills_feedback)} />
-        <TextBlock
-          title="Experience"
-          text={asString(analysis.experience_feedback)}
-        />
-        <TextBlock
-          title="Structure"
-          text={asString(analysis.structure_feedback)}
-        />
-      </div>
-
-      <ListBlock
-        title="Next steps"
-        items={asStringList(analysis.simple_suggestions)}
-      />
-      <ListBlock
-        title="Priority action plan"
-        items={asStringList(analysis.priority_action_plan)}
-      />
-      <ListBlock
-        title="Interview talking points"
-        items={asStringList(analysis.interview_talking_points)}
-      />
-
-      {hasSkillTags ? (
-        <div className="history-analysis-grid">
-          {hardSkills.length > 0 ? (
-            <section className="history-analysis-block">
-              <h4 className="history-analysis-block-title">Hard skills</h4>
-              <TagList items={hardSkills} />
-            </section>
-          ) : null}
-          {softSkills.length > 0 ? (
-            <section className="history-analysis-block">
-              <h4 className="history-analysis-block-title">Soft skills</h4>
-              <TagList items={softSkills} />
-            </section>
-          ) : null}
-          {missingHard.length > 0 ? (
-            <section className="history-analysis-block">
-              <h4 className="history-analysis-block-title">Missing vs job (hard)</h4>
-              <TagList items={missingHard} />
-            </section>
-          ) : null}
-          {missingSoft.length > 0 ? (
-            <section className="history-analysis-block">
-              <h4 className="history-analysis-block-title">Missing vs job (soft)</h4>
-              <TagList items={missingSoft} />
-            </section>
-          ) : null}
-          {keywords.length > 0 ? (
-            <section className="history-analysis-block">
-              <h4 className="history-analysis-block-title">Keywords</h4>
-              <TagList items={keywords} />
-            </section>
-          ) : null}
-        </div>
-      ) : null}
-
-      <TextBlock
-        title="Recruiter lens"
-        text={asString(analysis.recruiter_lens)}
-      />
-      <TextBlock
-        title="Optimized draft"
-        text={asString(analysis.optimized_resume)}
-      />
-    </article>
-  );
 }
 
 export function HistoryWorkspace() {
@@ -302,7 +103,7 @@ export function HistoryWorkspace() {
   }, []);
 
   const loadAnalysis = useCallback(
-    async (resumeId: string, storage_path: string, version: number) => {
+    async (resume: Resume) => {
       analysisControllerRef.current?.abort();
       const controller = new AbortController();
       analysisControllerRef.current = controller;
@@ -312,11 +113,17 @@ export function HistoryWorkspace() {
         timeout: 10_000,
       };
 
-      setSelected({ resumeId, storage_path, version });
+      setSelected({
+        resumeId: resume.resume_id,
+        storage_path: resume.storage_path,
+        version: resume.version,
+        filename: resume.filename,
+        updatedWithOptimizer: Boolean(resume.updated_with_optimizer),
+      });
       setAnalysis(null);
       setAnalysisState("loading");
 
-      const detail = await getResume(resumeId, version, options);
+      const detail = await getResume(resume.resume_id, resume.version, options);
 
       if (
         controller.signal.aborted ||
@@ -327,7 +134,14 @@ export function HistoryWorkspace() {
 
       const nextAnalysis = asRecord(detail?.analysis);
       const hasAnalysis = Object.keys(nextAnalysis).length > 0;
-      setAnalysis(hasAnalysis ? nextAnalysis : null);
+      setAnalysis(
+        hasAnalysis
+          ? {
+              ...nextAnalysis,
+              resume_filename: resume.filename,
+            }
+          : null,
+      );
       setAnalysisState(hasAnalysis ? "ready" : "error");
       analysisControllerRef.current = null;
     },
@@ -428,8 +242,9 @@ export function HistoryWorkspace() {
             Saved premium analyses
           </h2>
           <p className="account-pane-lead">
-            Each file keeps its versions. You can reopen an analysis anytime,
-            and delete older versions — the latest one stays.
+            Each file keeps its versions. Reopen a full fit report anytime, and
+            delete older versions — the latest one stays. Optimized means that
+            version was overwritten with the accepted rewrite.
           </p>
         </div>
         <button
@@ -501,47 +316,121 @@ export function HistoryWorkspace() {
                   const deleting = deletingKey === key;
                   const viewing =
                     isSelected && analysisState === "loading";
+                  const optimized = Boolean(resume.updated_with_optimizer);
+                  const showPanel = isSelected && analysisState !== "idle";
 
                   return (
                     <li
                       key={key}
-                      className={`history-version${isSelected ? " is-selected" : ""}`}
+                      className={`history-version${isSelected ? " is-selected" : ""}${showPanel ? " is-expanded" : ""}`}
                     >
-                      <div className="history-version-copy">
-                        <p className="history-version-label">
-                          <a href={resume.storage_path} target="_blank">Version {resume.version}</a>
-                        </p>
-                        {isLatest ? (
-                          <span className="history-latest-badge">Latest</span>
-                        ) : null}
+                      <div className="history-version-row">
+                        <div className="history-version-copy">
+                          <p className="history-version-label">
+                            <a
+                              href={resume.storage_path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Version {resume.version}
+                            </a>
+                          </p>
+                          {isLatest ? (
+                            <span className="history-latest-badge">Latest</span>
+                          ) : null}
+                          {optimized ? (
+                            <span className="history-optimized-badge">Optimized</span>
+                          ) : null}
+                        </div>
+                        <div className="history-version-actions">
+                          <button
+                            type="button"
+                            className="mkt-btn mkt-btn-ghost"
+                            disabled={viewing}
+                            aria-expanded={showPanel}
+                            onClick={() => {
+                              if (isSelected) {
+                                closeAnalysis();
+                                return;
+                              }
+                              void loadAnalysis(resume);
+                            }}
+                          >
+                            {viewing
+                              ? "Opening…"
+                              : isSelected
+                                ? "Hide analysis"
+                                : "View analysis"}
+                          </button>
+                          <button
+                            type="button"
+                            className="mkt-btn mkt-btn-ghost history-delete"
+                            disabled={isLatest || deleting}
+                            title={
+                              isLatest
+                                ? "The latest version has to stay"
+                                : `Delete version ${resume.version}`
+                            }
+                            onClick={() => {
+                              void onDelete(resume, isLatest);
+                            }}
+                          >
+                            {deleting ? "Deleting…" : "Delete"}
+                          </button>
+                        </div>
                       </div>
-                      <div className="history-version-actions">
-                        <button
-                          type="button"
-                          className="mkt-btn mkt-btn-ghost"
-                          disabled={viewing}
-                          onClick={() => {
-                            void loadAnalysis(resume.resume_id, resume.storage_path, resume.version);
-                          }}
-                        >
-                          {viewing ? "Opening…" : "View analysis"}
-                        </button>
-                        <button
-                          type="button"
-                          className="mkt-btn mkt-btn-ghost history-delete"
-                          disabled={isLatest || deleting}
-                          title={
-                            isLatest
-                              ? "The latest version has to stay"
-                              : `Delete version ${resume.version}`
-                          }
-                          onClick={() => {
-                            void onDelete(resume, isLatest);
-                          }}
-                        >
-                          {deleting ? "Deleting…" : "Delete"}
-                        </button>
-                      </div>
+
+                      {showPanel ? (
+                        <div className="history-version-panel">
+                          {analysisState === "loading" ? (
+                            <div className="account-status" aria-busy="true">
+                              Opening this analysis…
+                            </div>
+                          ) : null}
+
+                          {analysisState === "error" ? (
+                            <div
+                              className="account-status account-status-error"
+                              role="alert"
+                            >
+                              <p>
+                                We could not open that analysis. Try again in a
+                                moment.
+                              </p>
+                              <button
+                                type="button"
+                                className="mkt-btn mkt-btn-primary"
+                                onClick={() => {
+                                  void loadAnalysis(resume);
+                                }}
+                              >
+                                Try again
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {analysisState === "ready" && analysis ? (
+                            <div className="history-analysis-shell">
+                              {selected?.updatedWithOptimizer ? (
+                                <div className="history-analysis-banner">
+                                  <p className="history-analysis-banner-meta">
+                                    Optimized overwrite applied to this version
+                                  </p>
+                                  <span className="history-optimized-badge">
+                                    Optimized
+                                  </span>
+                                </div>
+                              ) : null}
+                              <AnalyzerResults
+                                result={analysis}
+                                againLabel="Hide analysis"
+                                showTtlWarning={false}
+                                onAnalyzeAgain={closeAnalysis}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -550,40 +439,6 @@ export function HistoryWorkspace() {
           ))}
         </div>
       )}
-
-      {selected && analysisState === "loading" ? (
-        <div className="account-status" aria-busy="true">
-          Opening this analysis…
-        </div>
-      ) : null}
-
-      {selected && analysisState === "error" ? (
-        <div className="account-status account-status-error" role="alert">
-          <p>We could not open that analysis. Try again in a moment.</p>
-          <button
-            type="button"
-            className="mkt-btn mkt-btn-primary"
-            onClick={() => {
-              void loadAnalysis(selected.resumeId, selected.storage_path, selected.version);
-            }}
-          >
-            Try again
-          </button>
-        </div>
-      ) : null}
-
-      {selected && analysis ? (
-        <HistoryAnalysis
-          storage_path={selected.storage_path}
-          filename={
-            groups.find((group) => group.resumeId === selected.resumeId)
-              ?.filename ?? "Resume"
-          }
-          version={selected.version}
-          analysis={analysis}
-          onClose={closeAnalysis}
-        />
-      ) : null}
     </section>
   );
 }

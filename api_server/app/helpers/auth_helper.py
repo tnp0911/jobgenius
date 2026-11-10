@@ -1,9 +1,13 @@
+import secrets
 from typing import Annotated
 
 from app.core.config import settings
 from app.schemas.user import PlanEnum, UserResponse
 from app.services.user_service import get_current_user
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import APIKeyHeader
+
+API_KEY_HEADER = APIKeyHeader(name="x-api-key", auto_error=True)
 
 
 def is_owner(
@@ -17,9 +21,11 @@ def is_owner(
     return True
 
 
-def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != settings.API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
+def verify_api_key(x_api_key: Annotated[str, Depends(API_KEY_HEADER)]):
+    if not secrets.compare_digest(x_api_key, settings.API_KEY):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API Key"
+        )
 
 
 def is_premium_user(

@@ -207,6 +207,9 @@ async def get_resumes_from_mongodb(user_id: int):
                     "version": response["version"],
                     "filename": response["filename"],
                     "storage_path": f"http://localhost:4566/{settings.S3_BUCKET_NAME}/{response['storage_path']}",
+                    "updated_with_optimizer": bool(
+                        response.get("updated_with_optimizer", False)
+                    ),
                 }
             )
         return resumes
