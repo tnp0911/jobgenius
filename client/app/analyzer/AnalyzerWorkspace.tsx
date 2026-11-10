@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
@@ -21,6 +21,7 @@ type Phase = "idle" | "loading" | "done";
 
 export function AnalyzerWorkspace() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { status, tier } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
@@ -42,6 +43,11 @@ export function AnalyzerWorkspace() {
     // Unverified users are asked again on every visit to this page.
     setVerifyModalOpen(needsEmailVerification(status));
   }, [status]);
+
+  useEffect(() => {
+    if (searchParams.get("analysisDeleted") !== "1") return;
+    router.replace("/analyzer", { scroll: false });
+  }, [searchParams, router]);
 
   async function onAnalyze() {
     controllerRef.current?.abort();

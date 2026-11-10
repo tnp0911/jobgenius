@@ -40,8 +40,8 @@ export function ResultWorkspace() {
         <p className="analyzer-pane-kicker">Results</p>
         <h2 className="analyzer-pane-title">Results unavailable</h2>
         <p className="analyzer-pane-lead">
-          We could not find the finished analysis in this browser session.
-          Run the analyzer again to generate a new report.
+          This analysis result was not found or has expired. Temporary results
+          are kept for 24 hours. Run the analyzer again to generate a new report.
         </p>
         <Link href="/analyzer" className="mkt-btn mkt-btn-primary">
           Back to analyzer

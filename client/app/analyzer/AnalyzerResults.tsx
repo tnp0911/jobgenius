@@ -1,25 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import type {
   FreeAnalyzeResult,
   PremiumAnalyzeResult,
 } from "@/services/resumeService";
 import {
+  deleteResumeAnalysisResult,
+  rerenderResume,
+} from "@/services/resumeService";
+import {
   extractJobsPayload,
   type JobCardData,
 } from "@/app/jrecommender/jobNormalize";
 import { renderAgentMarkdown } from "@/utils/agentMarkdown";
+import { normalizeAnalyzeResult } from "@/utils/normalizeAnalyzeResult";
 import { OptimizerSuggestions } from "@/components/optimizer/OptimizerSuggestions";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 type AnalyzerResultsProps = {
-  result: FreeAnalyzeResult | PremiumAnalyzeResult;
+  result: FreeAnalyzeResult | PremiumAnalyzeResult | Record<string, unknown>;
   onAnalyzeAgain: () => void;
   jobId?: string;
+  againLabel?: string;
+  /** Show the 24h Redis TTL warning (default: when jobId is set). */
+  showTtlWarning?: boolean;
 };
 
-type DecisionState = "pending" | "accepted" | "rejected";
+type DecisionState = "pending" | "accepted" | "rejected" | "busy";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -55,8 +65,15 @@ function scoreTone(pct: number | null): "strong" | "ok" | "weak" | "empty" {
 function isPremiumResult(
   result: FreeAnalyzeResult | PremiumAnalyzeResult,
 ): result is PremiumAnalyzeResult {
+  if ("rerender" in result && result.rerender != null) return true;
+  if ("job_finder" in result && result.job_finder != null) return true;
+  if (!("optimizer" in result) || result.optimizer == null) return false;
+  const optimizer = asRecord(result.optimizer);
   return (
-    "optimizer" in result || "job_finder" in result || "rerender" in result
+    asStringList(optimizer.changes_made).length > 0 ||
+    asStringList(optimizer.section_order).length > 0 ||
+    Object.keys(asRecord(optimizer.optimized_sections)).length > 0 ||
+    asString(optimizer.optimization_notes).length > 0
   );
 }
 
@@ -281,11 +298,13 @@ function buildPdfBlobUrl(pdfBase64: string): string | null {
 function OptimizedPdfPanel({
   pdfBase64,
   decision,
+  busy,
   onAccept,
   onReject,
 }: {
   pdfBase64: string;
   decision: DecisionState;
+  busy: boolean;
   onAccept: () => void;
   onReject: () => void;
 }) {
@@ -307,10 +326,11 @@ function OptimizedPdfPanel({
           <h3 id="analyzer-pdf-title" className="analyzer-results-block-title">
             Highlighted changes preview
           </h3>
+          <strong style={{ color: "red" }}>Please refresh the page if the PDF preview is not showing.</strong>
           <p className="analyzer-pdf-panel-lead">
             Yellow highlights show optimizer edits. Accept to overwrite your
-            original resume with the optimized version, or reject to stay with
-            your original resume.
+            original resume with the optimized version, or reject to discard
+            this preview and analysis result.
           </p>
         </div>
         {pdfUrl ? (
@@ -342,11 +362,12 @@ function OptimizedPdfPanel({
       </div>
 
       <div className="analyzer-pdf-actions">
-        {decision === "pending" ? (
+        {decision === "pending" || decision === "busy" ? (
           <>
             <button
               type="button"
               className="mkt-btn mkt-btn-ghost analyzer-pdf-reject"
+              disabled={busy}
               onClick={onReject}
             >
               Reject changes
@@ -354,6 +375,7 @@ function OptimizedPdfPanel({
             <button
               type="button"
               className="mkt-btn mkt-btn-primary analyzer-pdf-accept"
+              disabled={busy}
               onClick={onAccept}
             >
               Accept optimization
@@ -365,7 +387,7 @@ function OptimizedPdfPanel({
             role="status"
           >
             {decision === "accepted"
-              ? "Optimization accepted. We’ll keep the rewritten resume."
+              ? "Optimization accepted. Your stored resume will be overwritten with the optimized version. You will be able to view the optimized resume in your history."
               : "Optimization rejected. Your original resume stays unchanged."}
           </p>
         )}
@@ -375,10 +397,21 @@ function OptimizedPdfPanel({
 }
 
 export function AnalyzerResults({
-  result,
+  result: rawResult,
   onAnalyzeAgain,
   jobId,
+  againLabel = "Analyze again",
+  showTtlWarning,
 }: AnalyzerResultsProps) {
+  const router = useRouter();
+  const result = useMemo(
+    () => normalizeAnalyzeResult(rawResult as Record<string, unknown>),
+    [rawResult],
+  );
+
+  const resumeFilename = asString(result.resume_filename) || null;
+  const resumeVersion =
+    typeof result.resume_version === "number" ? result.resume_version : null;
   const intent = asRecord(result.intent);
   const analyzer = asRecord(result.analyzer);
   const ats = asRecord(result.ats);
@@ -388,7 +421,9 @@ export function AnalyzerResults({
       : asRecord(result.feedback);
   const premium = isPremiumResult(result);
   const jobFinder = premium ? result.job_finder : null;
-  const optimizer = premium ? result.optimizer : null;
+  const optimizer = premium ? result.optimizer : asRecord(
+    (result as { optimizer?: unknown }).optimizer,
+  );
   const rerender = premium ? asRecord(result.rerender) : {};
   const pdfBase64 = asString(rerender.pdf_base64);
 
@@ -408,6 +443,11 @@ export function AnalyzerResults({
   const changesMade = asStringList(asRecord(optimizer).changes_made);
 
   const [decision, setDecision] = useState<DecisionState>("pending");
+  const [ttlOpen, setTtlOpen] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const shouldWarnTtl = showTtlWarning ?? Boolean(jobId);
 
   useEffect(() => {
     try {
@@ -418,23 +458,69 @@ export function AnalyzerResults({
     }
   }, [targetRole, seniority]);
 
+  useEffect(() => {
+    if (!shouldWarnTtl || !jobId) return;
+    const key = `analyzer_ttl_warned_${jobId}`;
+    try {
+      if (sessionStorage.getItem(key) === "1") return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // still show once in this mount if storage is unavailable
+    }
+    setTtlOpen(true);
+  }, [shouldWarnTtl, jobId]);
+
   const metaLine =
     [seniority, industry ? industry.charAt(0).toUpperCase() + industry.slice(1) : ""]
       .filter(Boolean)
       .join(" · ") || "General resume quality and structure feedback";
 
-  function handleAccept() {
+  async function confirmAccept() {
+    if (!jobId) {
+      setDecision("accepted");
+      setAcceptOpen(false);
+      toast.success("Optimization accepted.");
+      return;
+    }
+    if (!resumeFilename || resumeVersion == null) {
+      toast.error(
+        "Missing resume details for overwrite. Please re-run the analysis.",
+      );
+      return;
+    }
+
+    setActionBusy(true);
+    setDecision("busy");
+    const data = await rerenderResume(jobId, resumeFilename, resumeVersion);
+    setActionBusy(false);
+    setAcceptOpen(false);
+
+    if (!data) {
+      setDecision("pending");
+      return;
+    }
+
     setDecision("accepted");
-    toast.success(
-      jobId
-        ? "Optimization accepted. Saving the rewritten resume…"
-        : "Optimization accepted.",
-    );
   }
 
-  function handleReject() {
+  async function handleReject() {
+    if (!jobId) {
+      setDecision("rejected");
+      return;
+    }
+
+    setActionBusy(true);
+    setDecision("busy");
+    const ok = await deleteResumeAnalysisResult(jobId);
+    setActionBusy(false);
+
+    if (!ok) {
+      setDecision("pending");
+      return;
+    }
+
     setDecision("rejected");
-    toast.info("Optimization rejected. Keeping your original resume.");
+    router.replace("/analyzer?analysisDeleted=1");
   }
 
   const breakdown = [
@@ -452,16 +538,66 @@ export function AnalyzerResults({
     { label: "Volunteer", value: ats.volunteer_score },
   ];
 
-  const hasPdf = Boolean(pdfBase64);
+  const hasPdf = Boolean(pdfBase64 && jobId);
 
   return (
     <div className={`analyzer-results${hasPdf ? " analyzer-results-with-pdf" : ""}`}>
+      <ConfirmModal
+        open={ttlOpen}
+        kicker="Temporary result"
+        title="This report expires in 24 hours"
+        confirmLabel="Got it"
+        showCancel={false}
+        onConfirm={() => setTtlOpen(false)}
+        onCancel={() => setTtlOpen(false)}
+      >
+        <p>
+          Analysis results are stored temporarily and will be deleted after 24
+          hours. The optimized resume preview will be removed at the same time.
+        </p>
+        <p>
+          Accept the optimization before then if you want it saved over your
+          current resume. A permanent analysis summary still stays in your
+          history.
+        </p>
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={acceptOpen}
+        kicker="Overwrite resume"
+        title="Replace your original resume?"
+        confirmLabel="Overwrite resume"
+        cancelLabel="Keep reviewing"
+        confirmTone="danger"
+        busy={actionBusy}
+        onConfirm={() => {
+          void confirmAccept();
+        }}
+        onCancel={() => {
+          if (!actionBusy) setAcceptOpen(false);
+        }}
+      >
+        <p>
+          Accepting will overwrite the resume currently stored for this file.
+          The original version cannot be recovered afterward.
+        </p>
+        <p>
+          Yellow highlights are only for preview — the saved file will use the
+          optimized content without highlight markup.
+        </p>
+      </ConfirmModal>
+
       <div className="analyzer-results-head">
         <div>
           <p className="analyzer-results-kicker">Resume check report</p>
           <h2 className="analyzer-results-title">
             {targetRole ? `Fit report for ${targetRole}` : "Resume fit report"}
           </h2>
+          {resumeFilename ? (
+            <p className="analyzer-results-meta">
+              Resume filename: <strong>{resumeFilename}</strong>
+            </p>
+          ) : null}
           <p className="analyzer-results-meta">{metaLine}</p>
         </div>
         <button
@@ -469,7 +605,7 @@ export function AnalyzerResults({
           className="mkt-btn mkt-btn-ghost analyzer-results-again"
           onClick={onAnalyzeAgain}
         >
-          Analyze again
+          {againLabel}
         </button>
       </div>
 
@@ -628,8 +764,11 @@ export function AnalyzerResults({
           <OptimizedPdfPanel
             pdfBase64={pdfBase64}
             decision={decision}
-            onAccept={handleAccept}
-            onReject={handleReject}
+            busy={actionBusy}
+            onAccept={() => setAcceptOpen(true)}
+            onReject={() => {
+              void handleReject();
+            }}
           />
         ) : null}
       </div>
