@@ -11,6 +11,7 @@ import { LoginRequest } from "@/auth/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAborted } from "@/utils/errorHelpers";
 import { EmailVerificationModal } from "@/components/EmailVerificationModal";
+import { notifyPendingAnalysisAfterLogin } from "@/utils/pendingAnalysisNotice";
 
 import "./login.css";
 
@@ -77,6 +78,7 @@ export function LoginForm() {
         return;
       }
       toast.success("Login successful");
+      void notifyPendingAnalysisAfterLogin();
       goHome();
     } catch (error: unknown) {
       if (isAborted(error) || controller.signal.aborted) return;
