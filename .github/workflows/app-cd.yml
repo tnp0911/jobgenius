@@ -8,6 +8,9 @@ on:
   #     - Spring CI Pipeline
   #   types:
   #     - completed
+  push:
+    branches:
+      - main
 
 # Define permissions for the workflow (only allow read access to contents and actions)
 permissions:
