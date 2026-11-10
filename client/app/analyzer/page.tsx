@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "../marketing.css";
 import "../../styles/agentMarkdown.css";
 import "../jrecommender/jobs.css";
@@ -30,7 +31,15 @@ export default function AnalyzerPage() {
 
       <section className="analyzer-stage" aria-label="Analyzer workspace">
         <div className="mkt-shell analyzer-stage-inner">
-          <AnalyzerWorkspace />
+          <Suspense
+            fallback={
+              <div className="analyzer-status" aria-busy="true">
+                Loading analyzer…
+              </div>
+            }
+          >
+            <AnalyzerWorkspace />
+          </Suspense>
         </div>
       </section>
     </div>

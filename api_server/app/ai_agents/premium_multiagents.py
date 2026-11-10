@@ -140,7 +140,7 @@ async def build_premium_graph():
     graph.add_edge("agent2_analyzer", "agent3_ats")
     graph.add_edge("agent3_ats", "agent4_optimizer")
     graph.add_edge("agent4_optimizer", "agent5_rerender")
-    graph.add_edge("agent5_rerender", "agent6_finalizer")
+    graph.add_edge("agent4_optimizer", "agent6_finalizer")
     graph.add_conditional_edges(
         "agent2_analyzer",
         includes_job_finder_edge,
@@ -149,6 +149,7 @@ async def build_premium_graph():
             "skip_jobfinder": END,
         },
     )
+    graph.add_edge("agent5_rerender", END)
     graph.add_edge("agent6_finalizer", END)
     graph.add_edge("agent7_jobfinder", END)
     return graph.compile()

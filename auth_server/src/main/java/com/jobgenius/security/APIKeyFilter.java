@@ -26,10 +26,10 @@ public class APIKeyFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        String apiKey = request.getHeader("X-API-KEY");
+        String apiKey = request.getHeader("x-api-key");
         if (apiKey == null || !apiKey.equals(validApiKey)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Unauthorized: Invalid API Key");
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("Forbidden: Invalid API Key");
             return;
         }
         filterChain.doFilter(request, response);

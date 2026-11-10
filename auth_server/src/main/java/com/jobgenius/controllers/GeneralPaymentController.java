@@ -1,20 +1,18 @@
 package com.jobgenius.controllers;
 
 import com.jobgenius.dto.StripePaymentRequest;
-import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.repositories.PaymentMetadataRepository;
+import com.jobgenius.repositories.UserRepository;
 import com.jobgenius.services.StripePaymentService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -23,6 +21,8 @@ public class GeneralPaymentController {
     private final StripePaymentService stripePaymentService;
     private final UserRepository userRepository;
     private final PaymentMetadataRepository paymentMetadataRepository;
+
+    private final Logger logger = LoggerFactory.getLogger(GeneralPaymentController.class);
 
     @PostMapping("/create-checkout-session")
     public ResponseEntity<Map> createCheckoutSession(@RequestBody StripePaymentRequest request,
@@ -63,10 +63,19 @@ public class GeneralPaymentController {
         Map<String, Long> details = (Map<String, Long>) authentication.getDetails();
         Long userId = details.get("user_id");
 
-        String subscriptionId = paymentMetadataRepository.findLatestSubscriptionIdByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+        Optional<String> subscriptionId = paymentMetadataRepository.findLatestSubscriptionIdByUserId(userId);
 
-        String message = stripePaymentService.changePaymentMethod(subscriptionId);
+        if (subscriptionId.isEmpty()) {
+            logger.error("Subscription not found to change the payment method for user ID: {}", userId);
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                        "error", "BAD_REQUEST",
+                        "message", "Subscription not found"
+                        )
+            );
+        }
+
+        String message = stripePaymentService.changePaymentMethod(String.valueOf(subscriptionId));
         return ResponseEntity.ok(Map.of(
                 "stripeUrl", message));
     }
@@ -76,9 +85,18 @@ public class GeneralPaymentController {
         Map<String, Long> details = (Map<String, Long>) authentication.getDetails();
         Long userId = details.get("user_id");
 
-        String subscriptionId = paymentMetadataRepository.findLatestSubscriptionIdByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+        Optional<String> subscriptionId = paymentMetadataRepository.findLatestSubscriptionIdByUserId(userId);
 
-        return ResponseEntity.ok(stripePaymentService.getNextBillingDate(subscriptionId));
+        if (subscriptionId.isEmpty()) {
+            logger.error("Subscription not found to get the next billing date for user ID: {}", userId);
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                        "error", "BAD_REQUEST",
+                        "message", "Subscription not found"
+                        )
+            );
+        }
+
+        return ResponseEntity.ok(stripePaymentService.getNextBillingDate(String.valueOf(subscriptionId)));
     }
 }

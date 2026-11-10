@@ -9,15 +9,18 @@ from app.ai_agents.premium_multiagents import GraphState as PremiumGraphState
 from app.ai_agents.premium_multiagents import build_premium_graph
 from app.db.redis import get_redis_client
 from app.db.s3 import get_s3_client
-from app.helpers.arq_helper import update_progress
+from app.helpers.arq_helper import (
+    RESULT_TTL_SECONDS,
+    add_pending_analysis,
+    refund_usage,
+    remove_key_from_redis,
+    remove_pending_analysis,
+    update_progress,
+)
 from app.helpers.resume_helper import (
     analyzer_result_to_text,
     format_analyzer_result,
     nested_agents_from_result,
-)
-from app.routers.resume_router import (
-    JOB_FINDER_RESET_WINDOW,
-    PREMIUM_ANALYZER_RESET_WINDOW,
 )
 from app.services.resume_analyzer import extract_text_from_resume
 from app.services.resume_service import (
@@ -112,23 +115,21 @@ async def analyze_resume_premium(
             raise RuntimeError("Failed to store resume to MongoDB.")
         returned_result["resume_version"] = resume_version
         returned_result["resume_id"] = f"{user_id}_{Path(resume_filename).stem}"
-        returned_result["resume_filename"] = Path(resume_filename).stem
+        returned_result["resume_filename"] = str(resume_filename)
         # Save results to Redis
         results_json = json.dumps(returned_result)
 
         await redis_client.setex(
-            f"resume_analysis:{job_id}:result", 60 * 60 * 24, results_json
+            f"resume_analysis:{job_id}:result", RESULT_TTL_SECONDS, results_json
         )  # Store for 24 hours
+        await add_pending_analysis(user_id, job_id)
 
-        count = await redis_client.incr(usage_key)
-        if count == 1:
-            await redis_client.expire(usage_key, PREMIUM_ANALYZER_RESET_WINDOW)
-        job_finder = returned_result.get("job_finder")
-        job_finder_jobs = _job_finder_jobs(job_finder)
-        if includes_job_finder and job_finder_jobs:
-            count = await redis_client.incr(job_finder_usage_key)
-            if count == 1:
-                await redis_client.expire(job_finder_usage_key, JOB_FINDER_RESET_WINDOW)
+        if includes_job_finder and job_finder_usage_key:
+            job_finder = returned_result.get("job_finder")
+            job_finder_jobs = _job_finder_jobs(job_finder)
+            # Refund if job finder was reserved but returned no jobs.
+            if not job_finder_jobs:
+                await refund_usage(job_finder_usage_key)
 
         await update_progress(
             job_id,
@@ -137,6 +138,9 @@ async def analyze_resume_premium(
         )
     except Exception as e:
         logger.exception(f"Error analyzing resume: {e}")
+        await refund_usage(usage_key)
+        if includes_job_finder and job_finder_usage_key:
+            await refund_usage(job_finder_usage_key)
         await update_progress(
             job_id,
             "FAILED",
@@ -209,6 +213,9 @@ async def rerender_resume_premium(
             rerendered_pdf_bytes,
             full_combined_text,
         )
+        await remove_key_from_redis(f"resume_analysis:{job_id}:result")
+        await remove_key_from_redis(f"resume_analysis:{job_id}:progress")
+        await remove_pending_analysis(user_id, job_id)
     except Exception as e:
         logger.exception(f"Error rerendering resume at rerender_resume_premium: {e}")
         raise

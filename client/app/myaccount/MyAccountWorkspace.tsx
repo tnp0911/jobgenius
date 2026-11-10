@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthOptions } from "@/auth/types";
 import { getCurrentUser, type CurrentUser } from "@/services/userService";
+import {
+  getPendingResumeAnalyses,
+  type PendingResumeAnalysis,
+} from "@/services/resumeService";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -34,7 +38,11 @@ export function MyAccountWorkspace() {
   const { status, tier } = useAuth();
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [pendingAnalyses, setPendingAnalyses] = useState<PendingResumeAnalysis[]>(
+    [],
+  );
   const controllerRef = useRef<AbortController | null>(null);
+  const pendingControllerRef = useRef<AbortController | null>(null);
   const loadIdRef = useRef(0);
 
   const loadUser = useCallback(async () => {
@@ -61,9 +69,36 @@ export function MyAccountWorkspace() {
     controllerRef.current = null;
   }, []);
 
+  const loadPending = useCallback(async () => {
+    if (tier?.toLowerCase() !== "premium") {
+      setPendingAnalyses([]);
+      return;
+    }
+
+    pendingControllerRef.current?.abort();
+    const controller = new AbortController();
+    pendingControllerRef.current = controller;
+
+    const pending = await getPendingResumeAnalyses({
+      signal: controller.signal,
+      timeout: 10_000,
+    });
+
+    if (
+      controller.signal.aborted ||
+      pendingControllerRef.current !== controller
+    ) {
+      return;
+    }
+
+    setPendingAnalyses(pending ?? []);
+    pendingControllerRef.current = null;
+  }, [tier]);
+
   useEffect(() => {
     return () => {
       controllerRef.current?.abort();
+      pendingControllerRef.current?.abort();
     };
   }, []);
 
@@ -71,6 +106,11 @@ export function MyAccountWorkspace() {
     if (status.status !== "authenticated") return;
     void loadUser();
   }, [status, loadUser]);
+
+  useEffect(() => {
+    if (status.status !== "authenticated") return;
+    void loadPending();
+  }, [status, loadPending]);
 
   if (status.status === "loading") {
     return (
@@ -133,6 +173,37 @@ export function MyAccountWorkspace() {
 
   return (
     <section className="account-pane" aria-labelledby="account-profile-title">
+      {pendingAnalyses.length > 0 ? (
+        <aside className="account-pending-banner" aria-labelledby="account-pending-title">
+          <div>
+            <p className="account-pane-kicker">Action needed</p>
+            <h3 id="account-pending-title" className="account-pending-title">
+              Optimized resume waiting for your decision
+            </h3>
+            <p className="account-pending-lead">
+              You have {pendingAnalyses.length === 1 ? "an analysis" : `${pendingAnalyses.length} analyses`}{" "}
+              still available for 24 hours. Open the result to accept or reject
+              the optimized resume.
+            </p>
+          </div>
+          <ul className="account-pending-list">
+            {pendingAnalyses.map((item) => (
+              <li key={item.job_id} className="account-pending-item">
+                <span className="account-pending-file">
+                  {item.resume_filename?.trim() || "Resume analysis"}
+                </span>
+                <Link
+                  href={`/analyzer/result/${encodeURIComponent(item.job_id)}`}
+                  className="mkt-btn mkt-btn-primary account-pending-link"
+                >
+                  Review result
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      ) : null}
+
       <div className="account-profile-head">
         <div className="account-avatar" aria-hidden="true">
           {initialsFromName(user.name)}
