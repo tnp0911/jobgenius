@@ -11,7 +11,10 @@ from app.helpers.job_indexing import schedule_job_indexing
 from app.helpers.llm_call import agent7_jobfinder_format_result
 from app.helpers.user_helper import get_user_city_and_country, get_user_ip_address
 from app.schemas.user import UserResponse
-from app.services.job_service import job_recommendation_with_pinecone, search_jobs_with_jsearch
+from app.services.job_service import (
+    job_recommendation_with_pinecone,
+    search_jobs_with_jsearch,
+)
 from app.services.resume_service import (
     get_resume_for_job_recommendation_from_mongodb,
     resolve_resume_id_for_recommendations,
@@ -73,7 +76,9 @@ async def get_job_recommendations_unlogged_in_user(request: Request):
             )
 
         query = f"any job in {city}, {country}"
-        jobs = await search_jobs_with_jsearch(query, country=country_code, language="en")
+        jobs = await search_jobs_with_jsearch(
+            query, country=country_code, language="en"
+        )
         if not jobs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
@@ -112,7 +117,7 @@ async def get_job_recommendations_free_user(
     request: Request,
     current_user: Annotated[UserResponse | None, Depends(get_current_user)],
     target_role: Annotated[str, Query()] = "any job",
-    seniority_level: Annotated[str, Query()] = ""
+    seniority_level: Annotated[str, Query()] = "",
 ):
     """
     Get job recommendations for a free user.
@@ -146,8 +151,12 @@ async def get_job_recommendations_free_user(
             )
         redis_client = get_redis_client()
         if target_role == "any job" and seniority_level == "":
-            saved_target_role = await redis_client.get(f"target_role:{current_user.uid}")
-            saved_seniority_level = await redis_client.get(f"seniority_level:{current_user.uid}")
+            saved_target_role = await redis_client.get(
+                f"target_role:{current_user.uid}"
+            )
+            saved_seniority_level = await redis_client.get(
+                f"seniority_level:{current_user.uid}"
+            )
             if saved_target_role:
                 target_role = saved_target_role
             if saved_seniority_level:
@@ -155,11 +164,16 @@ async def get_job_recommendations_free_user(
         else:
             target_role_key = f"target_role:{current_user.uid}"
             seniority_level_key = f"seniority_level:{current_user.uid}"
-            await redis_client.set(target_role_key, target_role, ex=FREE_RECOMMENDATIONS_CACHE_TTL)
-            await redis_client.set(seniority_level_key, seniority_level, ex=FREE_RECOMMENDATIONS_CACHE_TTL)
+            await redis_client.set(
+                target_role_key, target_role, ex=FREE_RECOMMENDATIONS_CACHE_TTL
+            )
+            await redis_client.set(
+                seniority_level_key, seniority_level, ex=FREE_RECOMMENDATIONS_CACHE_TTL
+            )
 
-
-        cache_input = f"{target_role}_{seniority_level}_{city}_{country_code}".lower().strip()
+        cache_input = (
+            f"{target_role}_{seniority_level}_{city}_{country_code}".lower().strip()
+        )
         logger.info(
             "cache_input=%r role=%r seniority=%r city=%r country=%r",
             cache_input,
@@ -184,12 +198,14 @@ async def get_job_recommendations_free_user(
             query = f"{target_role.strip()} in {city}, {country}"
         else:
             query = f"{target_role.strip()} at {seniority_level.strip()} level in {city}, {country}"
-        jobs = await search_jobs_with_jsearch(query, country=country_code, language="en")
+        jobs = await search_jobs_with_jsearch(
+            query, country=country_code, language="en"
+        )
         if not jobs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
             )
-        
+
         ok = await cache_set(
             recommendations_cache_key,
             json.dumps(jobs),
@@ -307,7 +323,9 @@ async def get_job_recommendations_premium_user(
                     status_code=status.HTTP_404_NOT_FOUND, detail=result["error"]
                 )
 
-            logger.info("Could not find jobs in Pinecone. Falling back to agent7_jobfinder")
+            logger.info(
+                "Could not find jobs in Pinecone. Falling back to agent7_jobfinder"
+            )
             user_requirements = (
                 f"I have provided my resume text. Help me find the best jobs for me "
                 f"in {city}, {country}."
