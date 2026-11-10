@@ -1,12 +1,9 @@
-from datetime import datetime, timezone
 from typing import Annotated
 
 from app.core.config import settings
-from app.db.session import get_db
-from app.schemas.user import PlanEnum, UserPlanUpdate, UserResponse
-from app.services.user_service import get_current_user, update_user_plan
+from app.schemas.user import PlanEnum, UserResponse
+from app.services.user_service import get_current_user
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy.orm import Session
 
 
 def is_owner(
