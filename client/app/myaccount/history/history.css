@@ -75,20 +75,50 @@
 }
 
 .history-version {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  display: grid;
+  gap: 0;
   padding: 0.8rem 0.9rem;
   border-radius: 12px;
   border: 1px solid transparent;
   background: rgba(239, 246, 255, 0.7);
 }
 
+.history-version-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .history-version.is-selected {
   border-color: rgba(37, 99, 235, 0.22);
   background: rgba(37, 99, 235, 0.08);
+}
+
+.history-version.is-expanded {
+  gap: 0.85rem;
+}
+
+.history-version-panel {
+  min-width: 0;
+  padding-top: 0.15rem;
+  border-top: 1px solid rgba(37, 99, 235, 0.14);
+}
+
+.history-version-panel .account-status {
+  margin-top: 0.75rem;
+}
+
+.history-version-panel .history-analysis-shell {
+  margin-top: 0.75rem;
+  padding: 0.85rem 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.history-version-panel .analyzer-results {
+  gap: 1rem;
 }
 
 .history-version-copy {
@@ -115,16 +145,50 @@
   text-decoration: underline;
 }
 
-.history-latest-badge {
+.history-latest-badge,
+.history-optimized-badge {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  background: var(--brand);
-  color: #fff;
   font-family: var(--font-display);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.history-latest-badge {
+  background: var(--brand);
+  color: #fff;
+}
+
+.history-optimized-badge {
+  background: rgba(16, 185, 129, 0.16);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+.history-analysis-shell {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem 1.15rem;
+  border-radius: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.94) 0%, rgba(239, 246, 255, 0.72) 100%);
+}
+
+.history-analysis-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+}
+
+.history-analysis-banner-meta {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .history-version-actions {
