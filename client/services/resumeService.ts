@@ -5,6 +5,9 @@ import { AuthOptions } from "@/auth/types";
 import { authConfig } from "@/auth/api";
 
 export type FreeAnalyzeResult = {
+  resume_filename: string | null;
+  resume_id?: string;
+  resume_version?: number;
   intent: Record<string, unknown>;
   analyzer: Record<string, unknown>;
   ats: Record<string, unknown>;
@@ -53,6 +56,9 @@ export type PremiumAnalyzeRerender = {
 };
 
 export type PremiumAnalyzeResult = {
+  resume_filename: string | null;
+  resume_id?: string;
+  resume_version?: number;
   intent: Record<string, unknown>;
   analyzer: Record<string, unknown>;
   ats: Record<string, unknown>;
@@ -141,8 +147,7 @@ export function premiumAnalyzeResumeSSE(
         return;
       }
       if (status === "FAILED") {
-        const message =
-          data.error || "Analysis failed. Please try again later.";
+        const message = "Analysis failed. We have given you one credit back for the premium analyzer. Please try again later.";
         toast.error(message);
         settle(() => handlers.onError?.(new Error(message)));
       }
@@ -197,11 +202,42 @@ export async function premiumAnalyzeResumeResult(
   }
 }
 
+export type PendingResumeAnalysis = {
+  job_id: string;
+  resume_filename: string | null;
+};
+
+export type PendingResumeAnalysesResponse = {
+  pending: PendingResumeAnalysis[];
+};
+
+export async function getPendingResumeAnalyses(
+  options?: AuthOptions,
+): Promise<PendingResumeAnalysis[] | null> {
+  try {
+    const { data } = await axios.get<PendingResumeAnalysesResponse>(
+      `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/resume/analyze/pending`,
+      authConfig(options),
+    );
+    return Array.isArray(data?.pending) ? data.pending : [];
+  } catch (error: unknown) {
+    if (isAborted(error)) return null;
+    console.error(error);
+    const errorMessage = axiosErrorMessage(
+      error,
+      "Failed to get pending resume analyses. Please try again later.",
+    );
+    console.error(errorMessage);
+    return null;
+  }
+}
+
 export type Resume = {
   resume_id: string;
   version: number;
   filename: string;
   storage_path: string;
+  updated_with_optimizer?: boolean;
   analysis?: Record<string, unknown> | null;
 };
 
@@ -261,6 +297,70 @@ export async function deleteResume(
     if (isAborted(error)) return false;
     console.error(error);
     const errorMessage = axiosErrorMessage(error, "Failed to delete resume. Please try again later.");
+    toast.error(errorMessage);
+    console.error(errorMessage);
+    return false;
+  }
+}
+
+
+/**
+* This function will be triggered when user clicks accept button for the optimized resume
+* @param jobId - The job ID of the optimized resume
+* @param resumeFullFilename - The full filename of the resume including the extension
+* @param version - The version of the resume
+* @param options - The authentication options
+* 
+* @returns Message indicating that the resume keep/rerender job is queued
+*/
+export async function rerenderResume(
+  jobId: string,
+  resumeFullFilename: string,
+  version: number,
+  options?: AuthOptions,
+): Promise<any> {
+  try {
+    const body = {
+      resume_full_filename: resumeFullFilename,
+      version: version,
+    };
+    const { data } = await axios.post<string>(
+      `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/resume/rerender/${jobId}`,
+      body,
+      authConfig(options),
+    );
+    return data;
+  } catch (error: unknown) {
+    if (isAborted(error)) return null;
+    console.error(error);
+    const errorMessage = axiosErrorMessage(error, "Failed to rerender resume. Please try again later.");
+    toast.error(errorMessage);
+    console.error(errorMessage);
+    return null;
+  }
+}
+
+/**
+ * This function will be triggered when user clicks reject button for the optimized resume
+ * @param jobId - The job ID of the optimized resume
+ * @param options - The authentication options
+ * 
+ * @returns Message indicating that the resume analysis result is deleted
+ */
+export async function deleteResumeAnalysisResult(
+  jobId: string,
+  options?: AuthOptions,
+): Promise<boolean> {
+  try {
+    await axios.delete<void>(
+      `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/resume/analyze/result/${jobId}`,
+      authConfig(options),
+    );
+    return true;
+  } catch (error: unknown) {
+    if (isAborted(error)) return false;
+    console.error(error);
+    const errorMessage = axiosErrorMessage(error, "Failed to delete resume analysis result. Please try again later.");
     toast.error(errorMessage);
     console.error(errorMessage);
     return false;
