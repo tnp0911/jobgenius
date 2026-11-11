@@ -31,7 +31,7 @@ class MyBaseHTTPMiddleware(BaseHTTPMiddleware):
                 or request.url.path == "/redoc"
             ):
                 response = await call_next(request)
-                logger.info("[STATUS CODE] Response: %s", response.status_code)
+                logger.info("[STATUS CODE] Response: %s for %s", response.status_code, request.url.path)
                 return response
             redis_client = get_redis_client()
             access_token = request.cookies.get("access_token")
@@ -39,7 +39,7 @@ class MyBaseHTTPMiddleware(BaseHTTPMiddleware):
                 payload = decode_jwt(access_token)
                 if payload.get("user_id") is not None:
                     response = await call_next(request)
-                    logger.info("[STATUS CODE] Response: %s", response.status_code)
+                    logger.info("[STATUS CODE] Response: %s for %s", response.status_code, request.url.path)
                     return response
 
             ip = get_user_ip_address(request)
@@ -52,7 +52,7 @@ class MyBaseHTTPMiddleware(BaseHTTPMiddleware):
                 )
             anonymous_uuid = request.cookies.get("anonymous_uuid")
             if not anonymous_uuid:
-                logger.info("[STATUS CODE] Response: %s", 400)
+                logger.info("[STATUS CODE] Response: %s for %s", 400, request.url.path)
                 return JSONResponse(
                     status_code=400, content={"detail": "Anonymous UUID is required"}
                 )
@@ -67,14 +67,14 @@ class MyBaseHTTPMiddleware(BaseHTTPMiddleware):
                     anonymous_uuid,
                     ip,
                 )
-                logger.info("[STATUS CODE] Response: %s", 429)
+                logger.info("[STATUS CODE] Response: %s for %s", 429, request.url.path)
                 return JSONResponse(
                     status_code=429,
                     content={"detail": "Too many requests. Please try again later."},
                 )
             if request.url.path.startswith("/api/recommendations"):
                 response = await call_next(request)
-                logger.info("[STATUS CODE] Response: %s", response.status_code)
+                logger.info("[STATUS CODE] Response: %s for %s", response.status_code, request.url.path)
                 return response
 
             usage_key = f"usage:{anonymous_uuid}"
@@ -83,7 +83,7 @@ class MyBaseHTTPMiddleware(BaseHTTPMiddleware):
                 logger.warning(
                     "Monthly limit exceeded for anonymous UUID: %s", anonymous_uuid
                 )
-                logger.info("[STATUS CODE] Response: %s", 429)
+                logger.info("[STATUS CODE] Response: %s for %s", 429, request.url.path)
                 return JSONResponse(
                     status_code=429,
                     content={
@@ -91,23 +91,23 @@ class MyBaseHTTPMiddleware(BaseHTTPMiddleware):
                     },
                 )
             response = await call_next(request)
-            logger.info("[STATUS CODE] Response: %s", response.status_code)
+            logger.info("[STATUS CODE] Response: %s for %s", response.status_code, request.url.path)
             return response
         except RuntimeError as e:
             if "No response returned." in str(e) and await request.is_disconnected():
                 logger.error("Request disconnected: %s", request.url)
-                logger.info("[STATUS CODE] Response: %s", status.HTTP_204_NO_CONTENT)
+                logger.info("[STATUS CODE] Response: %s for %s", status.HTTP_204_NO_CONTENT, request.url.path)
                 return Response(status_code=status.HTTP_204_NO_CONTENT)
             raise
         except Exception as e:
             logger.error("Error: %s", e)
             logger.info(
-                "[STATUS CODE] Response: %s", status.HTTP_500_INTERNAL_SERVER_ERROR
+                "[STATUS CODE] Response: %s for %s", status.HTTP_500_INTERNAL_SERVER_ERROR, request.url.path
             )
             return JSONResponse(
                 status_code=500, content={"detail": "Internal server error"}
             )
         finally:
             logger.info(
-                "[END] Request processing time: %s seconds", time.time() - start
+                "[END] Request processing time: %s seconds for %s", time.time() - start, request.url.path
             )

@@ -24,6 +24,7 @@ async def search_jobs_with_jsearch(query: str, country: str = "ca", language: st
         params["employment_types"] = ",".join(employment_types)
     if job_requirements:
         params["job_requirements"] = ",".join(job_requirements)
+    logger.warning("WARNING: Calling JSearch API")
     response = await niquests.aget(
         f"{settings.JSEARCH_HOST}/search-v2",
         headers=settings.JSEARCH_HEADERS,
