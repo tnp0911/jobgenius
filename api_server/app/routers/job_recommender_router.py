@@ -3,22 +3,17 @@ import json
 import logging
 from typing import Annotated
 
-from app.ai_agents.agents.agent7_jobfinder import jobfinder_agent
 from app.auth.dependencies import get_current_user_id
 from app.db.redis import cache_get, cache_set, get_redis_client
 from app.helpers.auth_helper import is_premium_user
 from app.helpers.job_indexing import schedule_job_indexing
-from app.helpers.llm_call import agent7_jobfinder_format_result
 from app.helpers.user_helper import get_user_city_and_country, get_user_ip_address
 from app.schemas.user import UserResponse
 from app.services.job_service import (
     job_recommendation_with_pinecone,
     search_jobs_with_jsearch,
 )
-from app.services.resume_service import (
-    get_resume_for_job_recommendation_from_mongodb,
-    resolve_resume_id_for_recommendations,
-)
+from app.services.resume_service import resolve_resume_id_for_recommendations
 from app.services.user_service import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
@@ -247,8 +242,8 @@ async def get_job_recommendations_premium_user(
 ):
     """
     Get job recommendations for a premium user.
-    Uses Pinecone similarity on stored resume text; falls back to free search
-    when no resume is stored, or to the jobfinder agent when Pinecone has no matches.
+    Uses Pinecone similarity on stored resume text; falls back to free JSearch
+    when no resume is stored or when Pinecone has no matches.
     """
     if not is_premium:
         raise HTTPException(
@@ -310,52 +305,19 @@ async def get_job_recommendations_premium_user(
                 {"provider": "pinecone", "jobs": result},
             )
 
-        if isinstance(result, dict) and result.get("error"):
-            resume_text = result.get("resume_text") or ""
-            if not resume_text:
-                stored = await get_resume_for_job_recommendation_from_mongodb(
-                    current_user_id, resolved_resume_id
-                )
-                resume_text = (stored or {}).get("full_combined_text") or ""
-
-            if not resume_text:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail=result["error"]
-                )
-
-            logger.info(
-                "Could not find jobs in Pinecone. Falling back to agent7_jobfinder"
-            )
-            user_requirements = (
-                f"I have provided my resume text. Help me find the best jobs for me "
-                f"in {city}, {country}."
-            )
-            agent_messages, raw_jobs = await jobfinder_agent(
-                resume_text=resume_text,
-                user_requirements=user_requirements,
-            )
-            formatted_response = agent7_jobfinder_format_result(
-                agent_messages, raw_jobs
-            )
-            if formatted_response.get("error"):
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=formatted_response["error"],
-                )
-
-            jobs = formatted_response.get("jobs") or []
-            if not jobs:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
-                )
-            schedule_job_indexing(jobs)
-            return await _cache_and_return_premium_recommendations(
-                recommendations_cache_key,
-                {"provider": "agent7_jobfinder", "jobs": jobs},
-            )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No jobs found"
+        # Pinecone miss / error — use free JSearch
+        logger.info(
+            "Could not find jobs in Pinecone for premium user %s; falling back to free recommendations",
+            current_user_id,
         )
+        response = await get_job_recommendations_free_user(
+            request=request,
+            current_user=current_user,
+            target_role=target_role,
+            seniority_level=seniority_level,
+        )
+        response.headers["fallback"] = "true"
+        return response
     except HTTPException:
         raise
     except ValueError as e:
