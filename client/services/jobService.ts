@@ -32,13 +32,15 @@ const HEADERS = {
   "client-ip-address": process.env.NEXT_PUBLIC_CLIENT_IP_ADDRESS || "",
 } as Record<string, string>;
 
-export async function getJobRecommendationsUnloggedInUser(): Promise<unknown> {
+export async function getJobRecommendationsUnloggedInUser(
+  options?: AuthOptions,
+): Promise<unknown> {
   try {
     const { data } = await axios.get<unknown>(
       `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/recommendations`,
-        authConfig({ timeout: 180_000, headers: HEADERS }),
-      );
-      return data;
+      authConfig({ timeout: 180_000, headers: HEADERS, ...options }),
+    );
+    return data;
   } catch (error) {
     if (isAborted(error)) throw error;
     console.error(error);
@@ -54,6 +56,7 @@ export async function getJobRecommendationsUnloggedInUser(): Promise<unknown> {
 export async function getJobRecommendationsFreeUser(
   target_role: string = "any job",
   seniority_level: string = "",
+  options?: AuthOptions,
 ): Promise<unknown> {
   try {
     const params = new URLSearchParams();
@@ -61,7 +64,7 @@ export async function getJobRecommendationsFreeUser(
     if (seniority_level !== "") params.append("seniority_level", seniority_level);
     const { data } = await axios.get<unknown>(
       `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/recommendations/free?${params.toString()}`,
-      authConfig({ timeout: 180_000, headers: HEADERS }),
+      authConfig({ timeout: 180_000, headers: HEADERS, ...options }),
     );
     return data;
   } catch (error) {
@@ -81,6 +84,7 @@ export async function getJobRecommendationsPremiumUser(
   target_role: string = "any job",
   seniority_level: string = "",
   setFallbackUsed: (fallbackUsed: boolean) => void,
+  options?: AuthOptions,
 ): Promise<unknown> {
   try {
     const params = new URLSearchParams();
@@ -89,7 +93,7 @@ export async function getJobRecommendationsPremiumUser(
     if (seniority_level !== "") params.append("seniority_level", seniority_level);
     const response = await axios.get<unknown>(
       `${process.env.NEXT_PUBLIC_FASTAPI_API_URL}/api/recommendations/premium?${params.toString()}`,
-      authConfig({ timeout: 180_000, headers: HEADERS }),
+      authConfig({ timeout: 180_000, headers: HEADERS, ...options }),
     );
     if (response.headers?.["fallback"] === "true") {
       setFallbackUsed(true);

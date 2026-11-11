@@ -307,12 +307,23 @@ export function JobRecommenderWorkspace() {
       return;
     }
 
+    // Wait for plan/tier before fetching — otherwise authenticated users briefly
+    // look non-premium and hit /free, then hit /premium again when tier arrives.
+    if (status.status === "authenticated" && tier == null) {
+      setPhase("loading");
+      return;
+    }
+
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     let cancelled = false;
 
     async function loadRecommendations() {
       setPhase("loading");
       setError(null);
       setMode("recommendations");
+      setFallbackUsed(false);
 
       let role = targetRole;
       let seniority = seniorityLevel;
@@ -329,39 +340,53 @@ export function JobRecommenderWorkspace() {
         }
       }
 
+      const options = { signal: controller.signal, timeout: 180_000 };
+
       try {
         let data: unknown;
         if (status.status === "unauthenticated") {
-          data = await getJobRecommendationsUnloggedInUser();
+          data = await getJobRecommendationsUnloggedInUser(options);
         } else if (isPremium) {
-          data = await getJobRecommendationsPremiumUser("", role, seniority, setFallbackUsed);
+          data = await getJobRecommendationsPremiumUser(
+            "",
+            role,
+            seniority,
+            setFallbackUsed,
+            options,
+          );
         } else {
-          data = await getJobRecommendationsFreeUser(role, seniority);
+          data = await getJobRecommendationsFreeUser(role, seniority, options);
         }
 
-        if (cancelled) return;
+        if (cancelled || controller.signal.aborted) return;
         const payload = extractJobsPayload(data);
         setJobs(payload.jobs);
         if (payload.jobs.length === 0) {
           setError("No jobs found nearby right now.");
         }
       } catch (err) {
-        if (cancelled) return;
-        if (isAborted(err)) return;
+        if (cancelled || controller.signal.aborted || isAborted(err)) return;
         const message = getErrorMessage(err, "Could not load recommendations.");
         setError(message);
         setJobs([]);
         toast.error(message);
       } finally {
-        if (!cancelled) setPhase("idle");
+        if (!cancelled && !controller.signal.aborted) setPhase("idle");
+        if (controllerRef.current === controller) {
+          controllerRef.current = null;
+        }
       }
     }
 
     void loadRecommendations();
     return () => {
       cancelled = true;
+      controller.abort();
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+      }
     };
-  }, [status, isPremium]);
+  }, [status, tier, isPremium]);
 
   async function refreshFreeRecommendations() {
     if (needsEmailVerification(status)) {
