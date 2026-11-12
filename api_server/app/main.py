@@ -66,7 +66,7 @@ app = FastAPI(
     # docs_url = None,
     # redoc_url=None,
     # openapi_url=None,
-    version = "3.1.0"
+    version = "3.1.1"
 )
 
 app.add_middleware(

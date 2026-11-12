@@ -6,87 +6,43 @@ import com.jobgenius.models.EmailVerificationToken;
 import com.jobgenius.models.User;
 import com.jobgenius.repositories.EmailVerificationTokenRepository;
 import com.jobgenius.repositories.UserRepository;
+import com.jobgenius.utils.FrontendLinkBuilder;
+import com.jobgenius.utils.TokenHelper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Base64;
-import java.util.HexFormat;
 
 @Service
 @RequiredArgsConstructor
 public class EmailVerificationService {
-    @Value("${FRONTEND_URL}")
-    private String frontendUrl;
-
     private static final int TOKEN_EXPIRATION_TIME = 24;
     private static final int RESEND_COOLDOWN_TIME = 5;
 
     private final EmailService emailService;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final UserRepository userRepository;
-
-    private static final SecureRandom RANDOM = new SecureRandom();
-    private String generateToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(bytes);
-    }
-
-    private String hashToken(String token) {
-        try {
-            MessageDigest digest =
-                    MessageDigest.getInstance("SHA-256");
-
-            byte[] hash = digest.digest(
-                    token.getBytes(StandardCharsets.UTF_8)
-            );
-
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(
-                    "SHA-256 is unavailable", e
-            );
-        }
-    }
-
-    private String buildVerificationLink(String rawToken) {
-        return UriComponentsBuilder
-                .fromUriString(frontendUrl)
-                .path("/register/verify_email")
-                .queryParam("token", rawToken)
-                .build()
-                .encode()
-                .toUriString();
-    }
+    private final TokenHelper tokenHelper;
+    private final FrontendLinkBuilder frontendLinkBuilder;
 
     private void createAndSendToken(User user) {
         // Remove the previous token before creating a new one.
         emailVerificationTokenRepository.deleteByUser_Uid(user.getUid());
         emailVerificationTokenRepository.flush();
 
-        String rawToken = generateToken();
+        String rawToken = tokenHelper.generateVerificationToken();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         EmailVerificationToken token = new EmailVerificationToken();
         token.setUser(user);
-        token.setTokenHash(hashToken(rawToken));
+        token.setTokenHash(tokenHelper.hashVerificationToken(rawToken));
         token.setCreatedAt(now);
         token.setExpiresAt(now.plusHours(TOKEN_EXPIRATION_TIME));
         emailVerificationTokenRepository.save(token);
 
-        String link = buildVerificationLink(rawToken);
+        String link = frontendLinkBuilder.buildVerificationLink(rawToken, "/register/verify_email");
         String plainText = """
                 Hi there,
 
@@ -148,7 +104,7 @@ public class EmailVerificationService {
             );
         }
         EmailVerificationToken token =
-                emailVerificationTokenRepository.findByTokenHash(hashToken(rawToken))
+                emailVerificationTokenRepository.findByTokenHash(tokenHelper.hashVerificationToken(rawToken))
                         .orElseThrow(() ->
                                 new IllegalArgumentException(
                                         "Invalid or expired verification link."
