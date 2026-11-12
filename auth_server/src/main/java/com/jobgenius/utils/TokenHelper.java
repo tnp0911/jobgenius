@@ -7,6 +7,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 
 @Component
@@ -14,6 +20,7 @@ import java.util.List;
 public class TokenHelper {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TokenHelper.class);
     private final RefreshTokenRepository refreshTokenRepository;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     // Revoke all refresh tokens for the user
     public void refreshTokenList(User user) {
@@ -27,6 +34,31 @@ public class TokenHelper {
         if (!refreshUnrevokedTokenList.isEmpty()) {
             refreshUnrevokedTokenList.forEach(token -> token.setRevoked(true));
             refreshTokenRepository.saveAll(refreshUnrevokedTokenList);
+        }
+    }
+    public String generateVerificationToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(bytes);
+    }
+
+    public String hashVerificationToken(String token) {
+        try {
+            MessageDigest digest =
+                    MessageDigest.getInstance("SHA-256");
+
+            byte[] hash = digest.digest(
+                    token.getBytes(StandardCharsets.UTF_8)
+            );
+
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(
+                    "SHA-256 is unavailable", e
+            );
         }
     }
 }

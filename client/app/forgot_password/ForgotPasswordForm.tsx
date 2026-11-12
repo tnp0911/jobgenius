@@ -1,110 +1,110 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { handleForgotPassword } from "@/auth/api";
-import { ForgotPasswordRequest } from "@/auth/types";
+import { handleForgotPasswordSendLink } from "@/auth/api";
+import { isAborted } from "@/utils/errorHelpers";
 
 import "./forgot_password.css";
 
 export function ForgotPasswordForm() {
-  const router = useRouter();
+  const controllerRef = useRef<AbortController | null>(null);
 
   const [email, setEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     setIsSubmitting(true);
 
     try {
-      const forgotPasswordRequest: ForgotPasswordRequest = {
-        email,
-        newPassword,
-      };
+      const response = await handleForgotPasswordSendLink(
+        { email: email.trim() },
+        { signal: controller.signal },
+      );
 
-      await handleForgotPassword(forgotPasswordRequest);
-      toast.success("Password updated successfully. Navigating to login page...");
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
+      if (controllerRef.current !== controller) return;
+
+      setEmailSent(true);
+      toast.success(
+        response.message ??
+          "Please check your email to proceed with the password reset process.",
+      );
     } catch (error: unknown) {
+      if (isAborted(error) || controller.signal.aborted) return;
+
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error("Failed to reset password. Please try again.");
+        toast.error("Failed to send reset email. Please try again.");
       }
     } finally {
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+      }
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="wrapper">
-      <h2>Reset Password</h2>
-      <p className="forgot-password-subtitle">
-        Enter your email and choose a new password.
-      </p>
+      <h2>Forgot Password</h2>
 
-      <form onSubmit={handleSubmit} className="forgot-password-form">
-        <div className="input-field">
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder=" "
-            required
-          />
-          <label htmlFor="email">Email</label>
-        </div>
+      {emailSent ? (
+        <>
+          <p className="forgot-password-subtitle">
+            Please check your email to proceed with the password reset process.
+          </p>
+          <p className="forgot-password-success-hint">
+            If an account exists for <strong>{email.trim()}</strong>, a reset
+            link has been sent. The link expires in 15 minutes.
+          </p>
+          <div className="forgot-password-form-bottom">
+            <p className="login-link">
+              Remember your password? <Link href="/login">Back to Login</Link>
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="forgot-password-subtitle">
+            Enter your email and we&apos;ll send you a link to reset your
+            password.
+          </p>
 
-        <div className="input-field">
-          <input
-            id="newPassword"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder=" "
-            autoComplete="new-password"
-            required
-          />
-          <label htmlFor="newPassword">New Password</label>
-        </div>
+          <form onSubmit={handleSubmit} className="forgot-password-form">
+            <div className="input-field">
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder=" "
+                required
+                autoComplete="email"
+              />
+              <label htmlFor="email">Email</label>
+            </div>
 
-        <div className="input-field">
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder=" "
-            autoComplete="new-password"
-            required
-          />
-          <label htmlFor="confirmPassword">Confirm Password</label>
-        </div>
+            <button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Sending..." : "Send reset link"}
+            </button>
+          </form>
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Updating..." : "Update Password"}
-        </button>
-      </form>
-
-      <div className="forgot-password-form-bottom">
-        <p className="login-link">
-          Remember your password? <Link href="/login">Back to Login</Link>
-        </p>
-      </div>
+          <div className="forgot-password-form-bottom">
+            <p className="login-link">
+              Remember your password? <Link href="/login">Back to Login</Link>
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

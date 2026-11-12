@@ -1,11 +1,5 @@
 package com.jobgenius.security;
 
-import java.io.IOException;
-import java.util.function.Supplier;
-
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import jakarta.servlet.FilterChain;
@@ -14,6 +8,11 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.function.Supplier;
 
 @RequiredArgsConstructor
 @Component
@@ -47,8 +46,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             ip = ip.split(",")[0].trim();
         }
         String anonymousKey = anonymousUuid + "_" + ip; // Combine anonymousUuid and IP to create a unique key
+        String fullAnonymousKey = "spring_rate_limit:" + anonymousKey;
         // Get or create bucket for the client's IP address and anonymousUuid
-        var bucket = proxyManager.builder().build(anonymousKey, bucketConfigurationSupplier);
+        var bucket = proxyManager.builder().build(fullAnonymousKey, bucketConfigurationSupplier);
 
         if (bucket.tryConsume(1)) { // Consume 1 token for the request
             filterChain.doFilter(request, response); // Allow request to proceed

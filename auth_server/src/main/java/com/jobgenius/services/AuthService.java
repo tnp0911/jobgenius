@@ -9,24 +9,23 @@ import com.jobgenius.models.User;
 import com.jobgenius.repositories.GAuthSecretKeyRepository;
 import com.jobgenius.repositories.RefreshTokenRepository;
 import com.jobgenius.repositories.UserRepository;
+import com.jobgenius.utils.FrontendLinkBuilder;
 import com.jobgenius.utils.TokenHelper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
 public class AuthService {
 
-    @Value("${API_KEY}")
-    private String apiKey;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
@@ -34,6 +33,7 @@ public class AuthService {
     private final RedisService redisService;
     private final WebClient webClient;
     private final GAuthSecretKeyRepository gAuthSecretKeyRepository;
+    private final FrontendLinkBuilder frontendLinkBuilder;
     private final Logger logger = LoggerFactory.getLogger(AuthService.class);
     private final TokenHelper tokenHelper;
 
@@ -115,4 +115,27 @@ public class AuthService {
             throw new RuntimeException("Error logging out user: " + e.getMessage());
         }
     }
+
+    public String forgotPasswordTokenVerificationLink(String email) {
+        try {
+            String verificationToken = tokenHelper.generateVerificationToken();
+            String hashedToken = tokenHelper.hashVerificationToken(verificationToken);
+            redisService.addForgotPasswordVerificationToken(hashedToken, email, 15 * 60 * 1000); // 15 minutes in milliseconds
+            return frontendLinkBuilder.buildVerificationLink(verificationToken, "/forgot_password/reset");
+        }
+        catch (Exception e) {
+            throw new RuntimeException("Error at forgotPasswordEmailTokenForVerification about generating forgot password verification token link: " + e.getMessage());
+        }
+    }
+
+    public Optional<String> verifyForgotPasswordToken(String token) {
+        try {
+            String hashedToken = tokenHelper.hashVerificationToken(token);
+            String email = redisService.getEmailByForgotPasswordVerificationToken(hashedToken);
+            return Optional.ofNullable(email);
+        } catch (Exception e) {
+            throw new RuntimeException("Error at verifyForgotPasswordToken: " + e.getMessage());
+        }
+    }
+
 }
