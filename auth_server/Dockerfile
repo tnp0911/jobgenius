@@ -1,6 +1,5 @@
 # Builder stage
 FROM eclipse-temurin:17-jdk-noble AS builder
-LABEL org.opencontainers.image.authors="Tuong Nguyen Pham <tuongnguyen2004danang@gmail.com>"
 WORKDIR /app
 
 COPY mvnw .
@@ -16,6 +15,18 @@ RUN ./mvnw clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jdk-noble
+ARG REVISION
+ARG CREATED
+LABEL org.opencontainers.image.title="JobGenius Auth Server - SpringBoot" \ 
+      org.opencontainers.image.description="SpringBoot backend service for JobGenius" \
+      org.opencontainers.image.source="https://github.com/tnp0911/jobgenius" \
+      org.opencontainers.image.url="https://github.com/tnp0911/jobgenius" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.vendor="tnp0911" \
+      org.opencontainers.image.authors="Tuong Nguyen Pham" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}"
+
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 # Make the application files accessible to the non-root user

@@ -69,6 +69,9 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            REVISION=${{ github.sha }}
+            CREATED=${{ steps.metadata.outputs.created }}
   
   docker-publish-spring:
     name: Docker Publish Spring
@@ -120,3 +123,6 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            REVISION=${{ github.sha }}
+            CREATED=${{ steps.metadata.outputs.created }}
