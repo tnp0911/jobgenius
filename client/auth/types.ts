@@ -26,12 +26,21 @@ export type UpdatePasswordResponse = {
     message?: string;
 };
 
-export type ForgotPasswordRequest = {
+export type ForgotPasswordSendLinkRequest = {
     email: string;
+};
+
+export type ForgotPasswordSendLinkResponse = {
+    error?: string;
+    message?: string;
+};
+
+export type ForgotPasswordUpdateRequest = {
+    token: string;
     newPassword: string;
 };
 
-export type ForgotPasswordResponse = {
+export type ForgotPasswordUpdateResponse = {
     error?: string;
     message?: string;
 };

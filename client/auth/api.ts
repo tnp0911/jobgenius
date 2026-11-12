@@ -1,8 +1,10 @@
 import axios from "axios";
 import {
     AuthOptions,
-    ForgotPasswordRequest,
-    ForgotPasswordResponse,
+    ForgotPasswordSendLinkRequest,
+    ForgotPasswordSendLinkResponse,
+    ForgotPasswordUpdateRequest,
+    ForgotPasswordUpdateResponse,
     LoginRequest,
     LoginResult,
     MfaCodeRequest,
@@ -132,12 +134,32 @@ export async function handleUpdatePassword(updatePasswordRequest: UpdatePassword
     }
 }
 
-export async function handleForgotPassword(forgotPasswordRequest: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
+export async function handleForgotPasswordSendLink(
+    request: ForgotPasswordSendLinkRequest,
+    options?: AuthOptions,
+): Promise<ForgotPasswordSendLinkResponse> {
     try {
-        const response = await axios.patch<ForgotPasswordResponse>(
-            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/forgot-password`,
-            forgotPasswordRequest,
-            authConfig(),
+        const response = await axios.post<ForgotPasswordSendLinkResponse>(
+            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/forgot-password-send-verification-link`,
+            request,
+            authConfig(options),
+        );
+        return response.data;
+    }
+    catch (error: unknown) {
+        rethrowAuthError(error);
+    }
+}
+
+export async function handleForgotPasswordUpdate(
+    request: ForgotPasswordUpdateRequest,
+    options?: AuthOptions,
+): Promise<ForgotPasswordUpdateResponse> {
+    try {
+        const response = await axios.patch<ForgotPasswordUpdateResponse>(
+            `${process.env.NEXT_PUBLIC_SPRING_API_URL}/auth/forgot-password-update`,
+            request,
+            authConfig(options),
         );
         return response.data;
     }
