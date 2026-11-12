@@ -271,23 +271,23 @@ services:
   #         - ollama_webui.local
 
   # Service 12: Mailpit
-  # mailpit:
-  #   container_name: mailpit
-  #   image: axllent/mailpit:latest
-  #   restart: unless-stopped
-  #   ports:
-  #     - "1025:1025"
-  #     - "8025:8025"
-  #   networks:
-  #     default:
-  #       aliases:
-  #         - mailpit.local
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8025/livez"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
+  mailpit:
+    container_name: mailpit
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      default:
+        aliases:
+          - mailpit.local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8025/livez"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Service 13: Resume Render LaTeX - (Awesome CV)[https://github.com/posquit0/Awesome-CV]
   # Build only (not started by `docker compose up`).

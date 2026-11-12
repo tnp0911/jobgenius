@@ -51,7 +51,7 @@
 
 ### Project Disclaimer
 
-JobGenius is a personal software engineering and learning project developed for educational, portfolio, and experimentation purposes. It demonstrates the design and implementation of a full-stack, AI-powered career platform using technologies such as microservices, LLMs, vector search, authentication, payments, and containerized infrastructure.
+JobGenius is a personal software engineering and learning project developed for ***educational, portfolio, and experimentation purposes***. It demonstrates the design and implementation of a full-stack, AI-powered career platform using technologies such as microservices, LLMs, vector search, authentication, payments, and containerized infrastructure.
 
 The application is under active development and is not intended to be a production-ready commercial service. Features, pricing, integrations, and implementation details may change without notice.
 
@@ -74,8 +74,9 @@ JobGenius acts as a sharp, impartial career mentor. Upload your resume (and opti
 1. **Parse & understand** your document — extracting sections, skills, experience timelines, certifications, languages, and professional links using deterministic regex-based NLP (zero hallucination risk).
 2. **Score your resume** with a weighted ATS scoring engine that simulates real recruiter heuristics — evaluating section completeness, metrics density, skill quality, experience depth, and job-description fit.
 3. **Rewrite & optimize** *(Premium)* — an LLM-driven optimizer restructures bullets, integrates missing keywords, and strengthens your narrative while strictly preserving factual accuracy (no fabricated employers, degrees, or metrics).
-4. **Coach you** — a finalizer agent delivers personalized feedback: executive-level recruiter lens evaluation,competitive market positioning, and a priority action plan.
-5. **Find matching jobs** *(Premium)* — an autonomous agent formulates location-aware search queries, retrieves real-time listings via MCP tool calls, indexes them into a vector database, and explains why each role fits your profile.
+4. **Re-render your resume** *(Premium)* — a LaTeX renderer rebuilds your resume using the Awesome-CV template, highlighting every change made by the optimizer so you can review before accepting.
+5. **Coach you** — a finalizer agent delivers personalized feedback: executive-level recruiter lens evaluation,competitive market positioning, and a priority action plan.
+6. **Find matching jobs** *(Premium)* — an autonomous agent formulates location-aware search queries, retrieves real-time listings via MCP tool calls, indexes them into a vector database, and explains why each role fits your profile.
 
 <!-- FEATURES -->
 
@@ -98,6 +99,12 @@ JobGenius acts as a sharp, impartial career mentor. Upload your resume (and opti
 - Integrates missing keywords from the job description naturally into your content
 - **Strict factual guardrails** — never fabricates employers, degrees, dates, or metrics
 
+### 📝 Resume Re-renderer *(Premium)*
+- Generates a new resume using the Awesome-CV LaTeX template
+- Highlights every change made by the optimizer for easy review
+- Compiles and renders the highlighted version as a polished PDF for review
+- Allows you to accept or reject changes before finalizing your resume
+
 ### 🎯 Career Coaching Feedback
 - **Free tier** — concise summary, section-by-section breakdown, and up to 5 actionable tips
 - **Premium tier** — executive recruiter lens evaluation, STAR-method interview talking points, competitive market positioning, and a prioritized weekly action plan
@@ -112,11 +119,14 @@ JobGenius acts as a sharp, impartial career mentor. Upload your resume (and opti
 - Autonomous agent builds search queries, fetches real-time listings via MCP, and explains why each role fits
 - Discovered jobs are automatically indexed into the vector database for future recommendations
 
-### 🔐 Authentication & Accounts
+### 🔐 Authentication
 - Email/password registration with BCrypt hashing
 - Google OAuth 2.0 single sign-on with automatic account merging
 - Secure HttpOnly JWT cookies (15-min access + 7-day refresh tokens)
 - Automatic token refresh on tab refocus with smart throttling
+- ***(NEW)*** Email verification
+- ***(NEW)*** Password reset via email link
+- ***(NEW)*** MFA (TOTP) with Google Authenticator
 
 ### 💳 Subscription & Billing
 - **Free tier** — 2 anonymous analyses/month, 3 authenticated analyses/week, 1 prompt search every 15 days
@@ -124,6 +134,11 @@ JobGenius acts as a sharp, impartial career mentor. Upload your resume (and opti
 - 14-day free trial on first subscription
 - Stripe-powered checkout with webhook-driven lifecycle management
 - Self-serve cancellation at any time
+- ***(NEW)*** Usage & billing dashboard with plan status, usage meters, and Stripe lifecycle visibility
+
+### 🪪 My Account & History
+- Profile overview with email, name, and subscription status
+- Resume upload history with versioning, inline analysis results, downloadable PDFs, and optional deletion
 
 ### 🛡️ Privacy First
 - All AI runs locally via Ollama — no resume data sent to external cloud providers
@@ -156,10 +171,11 @@ JobGenius acts as a sharp, impartial career mentor. Upload your resume (and opti
 | Category | Technologies |
 |----------|-------------|
 | **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) ![Axios](https://img.shields.io/badge/Axios-5A29E4?style=for-the-badge&logo=axios&logoColor=white) |
-| **API Server** [README](https://github.com/tnp0911/jobgenius/blob/main/api_server/README.md) | ![Python](https://img.shields.io/badge/Python_3-3776AB?style=for-the-badge&logo=python&logoColor=white) ![UV](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI_0.135-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white) ![Pydantic](https://img.shields.io/badge/Pydantic_v2-E92063?style=for-the-badge&logo=pydantic&logoColor=white) ![Uvicorn](https://img.shields.io/badge/Uvicorn-2F4F4F?style=for-the-badge&logo=gunicorn&logoColor=white) ![ARQ](https://img.shields.io/badge/ARQ-Worker_%26_Queue-DC382D?style=for-the-badge&logo=redis&logoColor=white)|
-| **Auth Server** [README](https://github.com/tnp0911/jobgenius/blob/main/auth_server/README.md) | ![Java](https://img.shields.io/badge/Java_17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.2.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white) ![Apache Maven](https://img.shields.io/badge/Apache_Maven-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white) ![Hibernate](https://img.shields.io/badge/Hibernate-59666C?style=for-the-badge&logo=hibernate&logoColor=white) ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=for-the-badge&logo=stripe&logoColor=white) |
-| **AI & ML** | ![LangChain](https://img.shields.io/badge/LangChain-7FC8FF?style=for-the-badge&logo=langchain&logoColor=white) ![LangGraph](https://img.shields.io/badge/LangGraph-7FC8FF?style=for-the-badge&logo=langgraph&logoColor=white) ![FastMCP](https://img.shields.io/badge/FastMCP-Job_Finder_Tools-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white) ![Qwen 3 8B](https://img.shields.io/badge/Qwen_2.5_7B-7C3AED?style=for-the-badge&logoColor=white) ![Nomic](https://img.shields.io/badge/Nomic_Embed_v2-4B5563?style=for-the-badge&logoColor=white) |
+| **API Server** <p>[README](https://github.com/tnp0911/jobgenius/blob/main/api_server/README.md)</p> | ![Python](https://img.shields.io/badge/Python_3-3776AB?style=for-the-badge&logo=python&logoColor=white) ![UV](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI_0.135-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white) ![Pydantic](https://img.shields.io/badge/Pydantic_v2-E92063?style=for-the-badge&logo=pydantic&logoColor=white) ![Uvicorn](https://img.shields.io/badge/Uvicorn-2F4F4F?style=for-the-badge&logo=gunicorn&logoColor=white) ![ARQ](https://img.shields.io/badge/ARQ-Worker_%26_Queue-DC382D?style=for-the-badge&logo=redis&logoColor=white)|
+| **Auth Server** <p>[README](https://github.com/tnp0911/jobgenius/blob/main/auth_server/README.md)</p> | ![Java](https://img.shields.io/badge/Java_17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.2.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white) ![Apache Maven](https://img.shields.io/badge/Apache_Maven-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white) ![Hibernate](https://img.shields.io/badge/Hibernate-59666C?style=for-the-badge&logo=hibernate&logoColor=white) ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=for-the-badge&logo=stripe&logoColor=white) |
+| **AI & ML** | ![LangChain](https://img.shields.io/badge/LangChain-7FC8FF?style=for-the-badge&logo=langchain&logoColor=white) ![LangGraph](https://img.shields.io/badge/LangGraph-7FC8FF?style=for-the-badge&logo=langgraph&logoColor=white) ![FastMCP](https://img.shields.io/badge/FastMCP-Job_Finder_Tools-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white) ![Qwen 3 8B](https://img.shields.io/badge/Qwen_3_8B-7C3AED?style=for-the-badge&logoColor=white) ![Nomic](https://img.shields.io/badge/Nomic_Embed_v2-4B5563?style=for-the-badge&logoColor=white) |
 | **Databases & Storage** | ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white) ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) ![Pinecone](https://img.shields.io/badge/Pinecone-000000?style=for-the-badge&logoColor=white) ![Amazon S3](https://img.shields.io/badge/Amazon_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white) |
+| **CI/CD** | ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
 | **Infrastructure** | ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![LocalStack](https://img.shields.io/badge/LocalStack-4B4DD3?style=for-the-badge&logoColor=white) ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white) ![OAuth 2.0](https://img.shields.io/badge/OAuth_2.0-EB5424?style=for-the-badge&logo=auth0&logoColor=white) |
 
 <!-- GETTING STARTED -->
@@ -214,9 +230,15 @@ docker compose up -d --build
 *This will build the application images (API Server, Auth Server, Background Worker), pull the necessary images, and start all services with detached mode.*
 
 ```sh
+docker compose build resume_render_latex
+```
+*This builds the LaTeX resume renderer service, which is required for premium resume re-rendering. 
+You must run this separately to build the image which will be used through the docker run command in the code when needed.*
+
+```sh
 docker compose up -d
 ```
-*This will pull the necessary images, and start all services with detached mode.*
+*This will pull the necessary images, and start all services (except for the resume_render_latex service) with detached mode.*
 
 Learn more about Docker commands in the [Docker CLI Cheatsheet](https://docs.docker.com/get-started/docker_cheatsheet.pdf).
 
@@ -224,8 +246,8 @@ Learn more about Docker commands in the [Docker CLI Cheatsheet](https://docs.doc
 **4. Start the Frontend Client**
 ```sh
 cd client
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 **5. Access the Application**
@@ -234,6 +256,19 @@ Once everything is running, you can access the services at:
 * **API Server Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 * **Auth Server Health**: [http://localhost:5000/health](http://localhost:5000/health)
 * **phpMyAdmin**: [http://localhost:8080](http://localhost:8080)
+
+
+### Testing
+```sh
+# change to the api_server directory
+cd api_server
+
+# Run unit tests
+uv run pytest app/tests/unit
+
+# Run integration tests (requires running services)
+uv run pytest app/tests/integration
+```
 
 <!-- USAGE -->
 
@@ -245,6 +280,7 @@ Use the web app for the full product experience, or call the API directly for sc
 
 ### Web Interface
 
+***Free Analysis Workflow (anonymous or free-tier users)***
 | Step | Action |
 |:----:|--------|
 | 1 | Open [http://localhost:3000/analyzer](http://localhost:3000/analyzer) |
@@ -252,10 +288,23 @@ Use the web app for the full product experience, or call the API directly for sc
 | 3 | Optionally paste a target job description and/or career goal |
 | 4 | Submit and wait for the analysis dashboard (scores, gaps, coaching tips) |
 
+
+***Premium Analysis Workflow***
+| Step | Action |
+|:----:|--------|
+| 1 | Open [http://localhost:3000/analyzer](http://localhost:3000/analyzer) |
+| 2 | Upload a text-based PDF resume (scanned image-only PDFs work poorly) |
+| 3 | Optionally paste a target job description and/or career goal |
+| 4 | Hit submit button |
+| 5 | You are redirected to the waiting page `/analyzer/waiting/<job_id>` and streams real-time progress updates via SSE (Server-Sent Events) |
+| 6 | Once the analysis is complete, you are redirected to the results dashboard `/analyzer/result/<job_id>` where you can view scores, gaps, coaching tips, and optionally re-render your resume in the Awesome-CV template. However, the results are stored in the Redis cache in 24 hours, so you need to make a decision on whether to accept or reject the changes before the cache expires. Otherwise, only the analysis results will be stored in the history with the original resume. |
+
+
+
 Related pages once you are signed in:
 
 - **Job recommender** — [http://localhost:3000/jrecommender](http://localhost:3000/jrecommender)
-- **Plans & billing** — [http://localhost:3000/plans](http://localhost:3000/plans)
+- **Plans** — [http://localhost:3000/plans](http://localhost:3000/plans)
 
 ### API
 
@@ -387,6 +436,7 @@ Loaded by Spring Boot (`SPRING_PROFILES_ACTIVE` selects `dev` / `proc` property 
 │   ├── 🐳 Dockerfile
 │   ├── 📋 pyproject.toml
 │   ├── 📌 uv.lock
+│   ├── 🎯 core/
 │   └── 📁 app/
 │       ├── ⚡ main.py
 │       ├── ⚙️ bg_worker.py
@@ -394,16 +444,27 @@ Loaded by Spring Boot (`SPRING_PROFILES_ACTIVE` selects `dev` / `proc` property 
 │       ├── 🤖 ai_agents/
 │       │   ├── 🆓 free_tier_multiagents.py
 │       │   ├── 👑 premium_multiagents.py
+│       │   └── 📝 instructions
+│       │       ├── 🧾 agent1_instructions.md
+│       │       ├── 🧾 agent4_instructions.md
+│       │       ├── 🧾 agent6_instructions.md
+│       │       └── 🧾 agent7_instructions.md
 │       │   └── 🧠 agents/
 │       │       ├── 🎯 agent1_intent.py
 │       │       ├── 🔍 agent2_analyzer.py
 │       │       ├── 📊 agent3_ats.py
 │       │       ├── ✍️ agent4_optimizer.py
+│       │       ├── 📝 agent5_rerender.py
 │       │       ├── 💬 agent6_finalizer.py
 │       │       └── 💼 agent7_jobfinder.py
+│       │   ├── 🛠️ tools/
+│       │   └── ➕ other_resources/
 │       │
 │       ├── 🛣️ routers/
 │       ├── 🧩 services/
+│       ├── ↔️ middlewares/
+│       ├── 🗄️ mcp/
+│       ├── 🗄️ internal_db/
 │       ├── 🗄️ db/
 │       │   ├── 🔴 redis.py
 │       │   ├── 🍃 mongo.py
@@ -432,6 +493,7 @@ Loaded by Spring Boot (`SPRING_PROFILES_ACTIVE` selects `dev` / `proc` property 
 │
 └── ▲ client/
     ├── 📦 package.json
+    ├── 📋 pnpm-lock.yaml
     ├── ⚙️ next.config.ts
     ├── 🔷 tsconfig.json
     │
@@ -445,12 +507,15 @@ Loaded by Spring Boot (`SPRING_PROFILES_ACTIVE` selects `dev` / `proc` property 
     │   ├── 💳 payment/
     │   ├── 👤 my_account/
     │   ├── ⚙️ settings_privacy/
-    │   └── 💰 usage_billing/
+    │   ├── 💰 usage_billing/
+    │   └── etc.
     │
     ├── 🧩 components/
     ├── 🔑 auth/
     ├── 🔄 contexts/
+    ├── 🌐 public/    
     ├── 📡 services/
+    ├── 🎨 styles/
     └── 🛠️ utils/
 ```
 **Note:** *This is a simplified view of the project structure. It may change at any time and does not include every file and directory.*
@@ -483,6 +548,7 @@ Distributed under the GNU Affero General Public License v3.0 License. See [LICEN
 
 Built with and inspired by excellent open-source projects and platforms:
 
+- [Awesome-CV](https://github.com/posquit0/Awesome-CV) - LaTeX resume template
 - [Next.js](https://nextjs.org/) / [React](https://react.dev/) — frontend
 - [FastAPI](https://fastapi.tiangolo.com/) / [Uvicorn](https://www.uvicorn.org/) / [Pydantic](https://docs.pydantic.dev/) — API server
 - [ARQ](https://arq-docs.helpmanual.io/) — Redis-backed background jobs
@@ -530,8 +596,6 @@ Thanks to everyone who builds and maintains these tools.
 [issues-url]: https://github.com/tnp0911/jobgenius/issues
 [license-shield]: https://img.shields.io/github/license/tnp0911/jobgenius?style=for-the-badge
 [license-url]: https://github.com/tnp0911/jobgenius/blob/main/LICENSE
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-0A66C2.svg?style=for-the-badge&logo=linkedin&logoColor=white
-[linkedin-url]: https://www.linkedin.com/in/tuongnguyenpham/
 [product-screenshot]: images/screenshot.png
 <!-- Shields.io badges. You can a comprehensive list with many more badges at: https://github.com/inttter/md-badges -->
 [Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
