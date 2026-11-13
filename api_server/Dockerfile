@@ -10,6 +10,18 @@ RUN uv sync --frozen --no-dev --no-install-project
     
 # ---- runtime ----
 FROM python:3.11.5-slim-bookworm
+ARG REVISION
+ARG CREATED
+LABEL org.opencontainers.image.title="JobGenius API Server - FastAPI" \ 
+      org.opencontainers.image.description="FastAPI backend service for JobGenius" \
+      org.opencontainers.image.source="https://github.com/tnp0911/jobgenius" \
+      org.opencontainers.image.url="https://github.com/tnp0911/jobgenius" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.vendor="tnp0911" \
+      org.opencontainers.image.authors="Tuong Nguyen Pham" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}"
+
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
